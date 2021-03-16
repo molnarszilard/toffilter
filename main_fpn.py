@@ -1,7 +1,6 @@
 import numpy as np
 import os, sys
-from constants import *
-from model_fpn import I2D
+from model_fpn import DFILT
 import argparse, time
 import torch
 from torch.autograd import Variable
@@ -15,6 +14,7 @@ from collections import Counter
 import matplotlib, cv2
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import open3d as o3d
 
 def adjust_learning_rate(optimizer, decay=0.1):
     """Sets the learning rate to the initial LR decayed by 0.5 every 20 epochs"""
@@ -29,7 +29,12 @@ class RMSE_log(nn.Module):
         if not fake.shape == real.shape:
             _,_,H,W = real.shape
             fake = F.upsample(fake, size=(H,W), mode='bilinear')
-        loss = torch.sqrt( torch.mean( torch.abs(torch.log(real)-torch.log(fake)) ** 2 ) )
+        eps=1e-7
+        real2 = real.clone()
+        fake2 = fake.clone()
+        real2[real2==0] = eps
+        fake2[fake2==0] = eps
+        loss = torch.sqrt( torch.mean( torch.abs(torch.log(real2)-torch.log(fake2)) ** 2 ) )
         return loss
 
 class L1(nn.Module):
@@ -107,7 +112,161 @@ class NormalLoss(nn.Module):
         real_norm = torch.sqrt( torch.sum( grad_real**2, dim=-1 ) )
         
         return 1 - torch.mean( prod/(fake_norm*real_norm) )
-            
+
+
+class PointLoss(nn.Module):
+    def __init__(self):
+        super(PointLoss, self).__init__()
+        
+    
+    def forward(self, depth_fake, depth_real):
+        # K[9] = {460.58518931365654, 0.0, 334.0805877590529, 0.0, 460.2679961517268, 169.80766383231037, 0.0, 0.0, 1.0} # pico zense
+        K = [582.62448167737955, 0.0, 313.04475870804731, 0.0, 582.69103270988637, 238.44389626620386, 0.0, 0.0, 1.0] # nyu_v2_dataset
+        # K = [582.624, 0.0, 313.044, 0.0, 582.691, 238.443, 0.0, 0.0, 1.0] # nyu_v2_dataset
+        fx = K[0]
+        fy = K[4]
+        x0 = K[2]
+        y0 = K[5]
+        rows, cols = depth_real[0][0].shape
+        c, _ = torch.meshgrid(torch.arange(cols), torch.arange(cols))
+        c = torch.meshgrid(torch.arange(cols))
+        new_c = c[0].reshape([1,cols]).to('cuda')
+        r = torch.meshgrid(torch.arange(rows))
+        new_r = r[0].unsqueeze(-1).to('cuda')
+        valid_real = (depth_real[0] > 0) & (depth_real[0] < 65535)
+        valid_fake = (depth_fake[0] > 0) & (depth_fake[0] < 65535)
+        nan_number = torch.tensor(np.nan).to('cuda')
+        eps_number = torch.tensor(1e-7).to('cuda')
+        zero_number = torch.tensor(0.).to('cuda')
+        max_loss = torch.tensor(10000.).to('cuda')
+
+        real_z = torch.where(valid_real, depth_real[0]/1000., eps_number)
+        real_x = torch.where(valid_real, real_z * (new_c - x0) / fx, eps_number)
+        real_y = torch.where(valid_real, real_z * (new_r - y0) / fy, eps_number)
+
+        fake_z = torch.where(valid_fake, depth_fake[0]/1000., eps_number)
+        fake_x = torch.where(valid_fake, fake_z * (new_c - x0) / fx, eps_number)
+        fake_y = torch.where(valid_fake, fake_z * (new_r - y0) / fy, eps_number)
+
+        lossZ=torch.mean(((real_z-fake_z).pow(2)).pow(0.5))
+        lossX=torch.mean(((real_x-fake_x).pow(2)).pow(0.5))
+        lossY=torch.mean(((real_y-fake_y).pow(2)).pow(0.5))
+
+        RMSE_log = torch.sqrt(torch.mean(torch.abs(torch.log(torch.abs(real_z))-torch.log(torch.abs(fake_z)))**2))
+       
+        # delta = [RMSE_log, lossX, lossY, lossZ]
+        loss = 10*RMSE_log * torch.abs(10*(3-torch.exp(1*lossX)-torch.exp(1*lossY)-torch.exp(1*lossZ)))
+        # while loss>max_loss:
+        #     loss=loss/10.
+        # loss = (lossX+lossY+lossZ)*100
+        return loss
+
+
+
+class DDDDepthDiff(nn.Module):
+    def __init__(self):
+        super(DDDDepthDiff, self).__init__()
+
+    def point_cloud(self, depth1):
+        """Transform a depth image into a point cloud with one point for each
+        pixel in the image, using the camera transform for a camera
+        centred at cx, cy with field of view fx, fy.
+
+        depth is a 2-D ndarray with shape (rows, cols) containing
+        depths from 1 to 254 inclusive. The result is a 3-D array with
+        shape (rows, cols, 3). Pixels with invalid depth in the input have
+        NaN for the z-coordinate in the result.
+
+        """
+        # depth is of shape (1,480,640)
+        # K[9] = {460.58518931365654, 0.0, 334.0805877590529, 0.0, 460.2679961517268, 169.80766383231037, 0.0, 0.0, 1.0} # pico zense
+        K = [582.62448167737955, 0.0, 313.04475870804731, 0.0, 582.69103270988637, 238.44389626620386, 0.0, 0.0, 1.0] # nyu_v2_dataset
+        # K = [582.624, 0.0, 313.045, 0.0, 582.691, 238.444, 0.0, 0.0, 1.0] # nyu_v2_dataset
+        fx = K[0]
+        fy = K[4]
+        cx = K[2]
+        cy = K[5]
+
+        depth = depth1.clone()
+        # open3d_img = o3d.t.geometry.Image(depth[0])#/1000.0)
+        # intrinsics = o3d.camera.PinholeCameraIntrinsic(640,360,fx,fy,cx,cy)
+        # pcd = o3d.geometry.create_point_cloud_from_depth_image(open3d_img,intrinsic=intrinsics)
+        rows, cols = depth[0].shape
+        # c, _ = torch.meshgrid(torch.arange(cols), torch.arange(cols))
+        c = torch.meshgrid(torch.arange(cols))
+        new_c = c[0].reshape([1,cols]).to('cuda')
+        r = torch.meshgrid(torch.arange(rows))
+        new_r = r[0].unsqueeze(-1).to('cuda')
+        valid = (depth[0] > 0) & (depth[0] < 65535)
+        nan_number = torch.tensor(np.nan).to('cuda')
+        eps_number = torch.tensor(1e-7).to('cuda')
+        zero_number = torch.tensor(0.).to('cuda')
+        z = torch.where(valid, depth[0]/1000.0, nan_number) # allways divide with 1000.0
+        x = torch.where(valid, z * (new_c - cx) / fx, nan_number)
+        y = torch.where(valid, z * (new_r - cy) / fy, nan_number)
+        
+
+        dimension = rows * cols
+        z_ok = z.reshape(dimension)
+        x_ok = x.reshape(dimension)
+        y_ok = y.reshape(dimension)
+    
+        return torch.stack((x_ok,y_ok,z_ok),dim=1) 
+
+    def forward(self, fake, real):
+        if not fake.shape == real.shape:
+            _,_ , H, W = real.shape
+            fake = F.interpolate(fake, size=(H, W), mode='bilinear')
+        eps = 1e-7
+        real1 = real[0].clone() #real[0].cpu().detach().numpy()
+        fake1 = fake[0].clone() #fake[0].cpu().detach().numpy()
+        
+        real_pcd = self.point_cloud(real1).clone() * 1000.0
+        fake_pcd = self.point_cloud(fake1).clone() * 1000.0
+
+        real_pcd[real_pcd==0] = eps
+        fake_pcd[fake_pcd==0] = eps
+
+        #######################
+        nan_z_real = real_pcd[:,2].clone()
+        temp_z_real = nan_z_real[~torch.isnan(nan_z_real)]
+       
+        nan_z_fake = fake_pcd[:,2].clone()
+        temp_z_fake = nan_z_fake[~torch.isnan(nan_z_real)]
+        
+        nan_x_real = real_pcd[:,0].clone()
+        temp_x_real = nan_x_real[~torch.isnan(nan_x_real)]
+        
+        nan_x_fake = fake_pcd[:,0].clone()
+        temp_x_fake = nan_x_fake[~torch.isnan(nan_x_real)]
+        
+        nan_y_real = real_pcd[:,1].clone()
+        temp_y_real = nan_y_real[~torch.isnan(nan_y_real)]
+        
+        nan_y_fake = fake_pcd[:,1].clone()
+        temp_y_fake = nan_y_fake[~torch.isnan(nan_y_real)]
+
+        z_real = temp_z_real[~torch.isnan(temp_z_fake)]
+        z_fake = temp_z_fake[~torch.isnan(temp_z_fake)]
+
+        x_real = temp_x_real[~torch.isnan(temp_x_fake)]
+        x_fake = temp_x_fake[~torch.isnan(temp_x_fake)]
+
+        y_real = temp_y_real[~torch.isnan(temp_y_fake)]
+        y_fake = temp_y_fake[~torch.isnan(temp_y_fake)]
+        
+
+        ######Original########
+        lossX = torch.mean(torch.abs(x_real-x_fake))
+        lossZ = torch.mean(torch.abs(z_real-z_fake))
+        lossY = torch.mean(torch.abs(y_real-y_fake))
+       
+        RMSE_log = torch.sqrt(torch.mean(torch.abs(torch.log(torch.abs(z_real))-torch.log(torch.abs(z_fake)))**2))
+       
+        delta = [RMSE_log, lossX, lossY, lossZ]
+        loss17 = 10*RMSE_log * torch.abs(10*(3-torch.exp(1*lossX)-torch.exp(1*lossY)-torch.exp(1*lossZ)))
+   
+        return delta, loss17
 # def get_acc(output, target):
 #     # takes in two tensors to compute accuracy
 #     pred = output.data.max(1, keepdim=True)[1] # get the index of the max log-probability
@@ -115,6 +274,7 @@ class NormalLoss(nn.Module):
 #     print("Target: ", Counter(target.data.cpu().numpy()))
 #     print("Pred: ", Counter(pred.cpu().numpy().flatten().tolist()))
 #     return float(correct)*100 / target.size(0) 
+
 
 
 def parse_args():
@@ -130,10 +290,11 @@ def parse_args():
                       default=10, type=int)
     parser.add_argument('--cuda', dest='cuda',
                       help='whether use CUDA',
+                      default=True,
                       action='store_true')
     parser.add_argument('--bs', dest='bs',
                       help='batch_size',
-                      default=4, type=int)
+                      default=1, type=int)
     parser.add_argument('--num_workers', dest='num_workers',
                       help='num_workers',
                       default=1, type=int)
@@ -147,13 +308,13 @@ def parse_args():
 # config optimization
     parser.add_argument('--o', dest='optimizer',
                       help='training optimizer',
-                      default="sgd", type=str)
+                      default="adam", type=str)
     parser.add_argument('--lr', dest='lr',
                       help='starting learning rate',
                       default=1e-3, type=float)
     parser.add_argument('--lr_decay_step', dest='lr_decay_step',
                       help='step to do learning rate decay, unit is epoch',
-                      default=5, type=int)
+                      default=3, type=int)
     parser.add_argument('--lr_decay_gamma', dest='lr_decay_gamma',
                       help='learning rate decay ratio',
                       default=0.1, type=float)
@@ -323,9 +484,9 @@ if __name__ == '__main__':
 
     # network initialization
     print('Initializing model...')
-    i2d = I2D(fixed_feature_weights=False)
+    dfilt = DFILT(fixed_feature_weights=False)
     if args.cuda:
-        i2d = i2d.cuda()
+        dfilt = dfilt.cuda()
         
     print('Done!')
 
@@ -337,7 +498,7 @@ if __name__ == '__main__':
 
     # params
     params = []
-    for key, value in dict(i2d.named_parameters()).items():
+    for key, value in dict(dfilt.named_parameters()).items():
       if value.requires_grad:
         if 'bias' in key:
             DOUBLE_BIAS=0
@@ -357,19 +518,21 @@ if __name__ == '__main__':
     depth_criterion = RMSE_log()
     grad_criterion = GradLoss()
     normal_criterion = NormalLoss()
+    point_criterion = PointLoss()
+    d_crit=DDDDepthDiff()
     eval_metric = RMSE_log()
     
     # resume
     if args.resume:
         load_name = os.path.join(args.output_dir,
-          'i2d_1_{}.pth'.format(args.checkepoch))
+          'dfilt_1_{}.pth'.format(args.checkepoch))
         print("loading checkpoint %s" % (load_name))
-        state = i2d.state_dict()
+        state = dfilt.state_dict()
         checkpoint = torch.load(load_name)
         args.start_epoch = checkpoint['epoch']
         checkpoint = {k: v for k, v in checkpoint['model'].items() if k in state}
         state.update(checkpoint)
-        i2d.load_state_dict(state)
+        dfilt.load_state_dict(state)
 #         optimizer.load_state_dict(checkpoint['optimizer'])
 #         lr = optimizer.param_groups[0]['lr']
         if 'pooling_mode' in checkpoint.keys():
@@ -387,7 +550,7 @@ if __name__ == '__main__':
     for epoch in range(args.start_epoch, args.max_epochs):
         
         # setting to train mode
-        i2d.train()
+        dfilt.train()
         start = time.time()
         if epoch % (args.lr_decay_step + 1) == 0:
             adjust_learning_rate(optimizer, args.lr_decay_gamma)
@@ -405,18 +568,47 @@ if __name__ == '__main__':
             start = time.time()
             data = train_data_iter.next()
             
-            img.data.resize_(data[0].size()).copy_(data[0])
-            z.data.resize_(data[1].size()).copy_(data[1])
+            img.resize_(data[0].size()).copy_(data[0])
+            z.resize_(data[1].size()).copy_(data[1])
+            imgn=img.clone()
+            imgn=imgn/torch.max(imgn)
+            imgmask=img.clone().squeeze()
+            imgmask=imgmask[0].unsqueeze(0).unsqueeze(0)
+            valid = (imgmask > 0) & (imgmask < 65535)
+            nan_number = torch.tensor(np.nan).to('cuda')
+            eps_number = torch.tensor(1e-7).to('cuda')
+            zero_number = torch.tensor(0.).to('cuda')
+            # print(step)
+            # print(torch.max(z))
+            max_depth=1*torch.max(z).cpu().detach().numpy()
+            zn=z.clone()
+            zn=zn/torch.max(zn)
 
             optimizer.zero_grad()
-            z_fake = i2d(img)
-            depth_loss = depth_criterion(z_fake, z)
+            z_fake = dfilt(imgn)
+            z_fake = torch.where(valid, z_fake, zero_number)
             
-            grad_real, grad_fake = imgrad_yx(z), imgrad_yx(z_fake)
-            grad_loss = grad_criterion(grad_fake, grad_real)     * grad_factor * (epoch>3)
-            normal_loss = normal_criterion(grad_fake, grad_real) * normal_factor * (epoch>7)
+            # print(torch.max(z_fake))
+            # z_fake=z_fake/torch.max(z_fake)
             
-            loss = depth_loss + grad_loss + normal_loss
+            # z_fake=z_fake*10000.
+            # depth_loss = depth_criterion(z_fake, z)
+            # point_loss=point_criterion(z_fake,z)
+
+            # o3d_pcd = o3d.geometry.PointCloud()
+            # input_depth = z_fake.clone() 
+            # input_pcd = d_crit.point_cloud(input_depth[0]).cpu().detach().numpy()
+            # o3d_pcd.points = o3d.utility.Vector3dVector(input_pcd*max_depth)
+            # o3d.io.write_point_cloud(args.output_dir+"/input_cloud"+str(epoch)+".pcd", o3d_pcd)
+            _,dloss=d_crit(z_fake,zn)
+            # print(dloss)
+            # grad_real, grad_fake = imgrad_yx(z), imgrad_yx(z_fake)
+            # grad_loss = grad_criterion(grad_fake, grad_real)     * grad_factor * (epoch>3)
+            # normal_loss = normal_criterion(grad_fake, grad_real) * normal_factor * (epoch>7)
+            
+            # loss = depth_loss + grad_loss + normal_loss
+            # loss = point_loss
+            loss = dloss
             loss.backward()
             optimizer.step()
 
@@ -425,15 +617,15 @@ if __name__ == '__main__':
             # info
             if step % args.disp_interval == 0:
 
-                print("[epoch %2d][iter %4d] loss: %.4f RMSElog: %.4f grad_loss: %.4f normal_loss: %.4f" \
-                                % (epoch, step, loss, depth_loss, grad_loss, normal_loss))
-#                 print("[epoch %2d][iter %4d] loss: %.4f iRMSE: %.4f" \
-#                                 % (epoch, step, loss, metric))
+                # print("[epoch %2d][iter %4d] loss: %.4f RMSElog: %.4f grad_loss: %.4f normal_loss: %.4f" \
+                #                 % (epoch, step, loss, depth_loss, grad_loss, normal_loss))
+                print("[epoch %2d][iter %4d] loss: %.4f " \
+                                % (epoch, step, loss))
         # save model
-        if epoch%10==0 or epoch==args.max_epochs-1:
-            save_name = os.path.join(args.output_dir, 'i2d_{}_{}.pth'.format(args.session, epoch))
+        if epoch%5==0 or epoch==args.max_epochs-1:
+            save_name = os.path.join(args.output_dir, 'dfilt_{}_{}.pth'.format(args.session, epoch))
             torch.save({'epoch': epoch+1,
-                    'model': i2d.state_dict(), 
+                    'model': dfilt.state_dict(), 
 #                     'optimizer': optimizer.state_dict(),
                    },
                    save_name)
@@ -443,7 +635,7 @@ if __name__ == '__main__':
             
         if epoch % 1 == 0:
             # setting to eval mode
-            i2d.eval()
+            dfilt.eval()
 
             img = Variable(torch.FloatTensor(1), volatile=True)
             z = Variable(torch.FloatTensor(1), volatile=True)
@@ -460,20 +652,22 @@ if __name__ == '__main__':
             for i, data in enumerate(eval_data_iter):
                 print(i,'/',len(eval_data_iter)-1)
 
-                img.data.resize_(data[0].size()).copy_(data[0])
-                z.data.resize_(data[1].size()).copy_(data[1])
-
-                z_fake = i2d(img)
-                depth_loss = float(img.size(0)) * rmse(z_fake, z)**2
-                eval_loss += depth_loss
-                rmse_accum += float(img.size(0)) * eval_metric(z_fake, z)**2
+                img.resize_(data[0].size()).copy_(data[0])
+                z.resize_(data[1].size()).copy_(data[1])
+                zn=z.clone()
+                zn=zn/torch.max(zn)
+                z_fake = dfilt(img)
+                _,dloss=d_crit(z_fake,zn)
+                # depth_loss = float(img.size(0)) * rmse(z_fake, z)**2
+                eval_loss += dloss
+                # rmse_accum += float(img.size(0)) * eval_metric(z_fake, z)**2
                 count += float(img.size(0))
 
-            print("[epoch %2d] RMSE_log: %.4f RMSE: %.4f" \
-                            % (epoch, torch.sqrt(eval_loss/count), torch.sqrt(rmse_accum/count)))
+            print("[epoch %2d] loss: %.4f " \
+                            % (epoch, torch.sqrt(eval_loss/count)))
             with open('val.txt', 'a') as f:
-                f.write("[epoch %2d] RMSE_log: %.4f RMSE: %.4f\n" \
-                            % (epoch, torch.sqrt(eval_loss/count), torch.sqrt(rmse_accum/count)))
+                f.write("[epoch %2d] loss: %.4f RMSE: %.4f\n" \
+                            % (epoch, torch.sqrt(eval_loss/count)))
 
        
 
