@@ -90,7 +90,7 @@ if __name__ == '__main__':
                     depth = combine_depth
                 depth2 = np.moveaxis(depth,-1,0)
                 img = torch.from_numpy(depth2).float().unsqueeze(0).cuda()
-                max_depth=15000
+                max_depth=15000.
                 start = timeit.default_timer()
                 img=img/max_depth
                 imgmask=img.clone().squeeze()

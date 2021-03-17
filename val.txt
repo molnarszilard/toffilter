@@ -111,3 +111,5 @@
 [epoch  7] RMSE_log: 18812.4062 RMSE: 12.0545
 [epoch  8] RMSE_log: 18814.7617 RMSE: 14.5861
 [epoch  9] RMSE_log: 18816.3750 RMSE: 14.1318
+[epoch  0] loss: nan
+[epoch  0] loss: 0.9428

@@ -197,19 +197,19 @@ class DDDDepthDiff(nn.Module):
         new_c = c[0].reshape([1,cols]).to('cuda')
         r = torch.meshgrid(torch.arange(rows))
         new_r = r[0].unsqueeze(-1).to('cuda')
-        valid = (depth[0] > 0) & (depth[0] < 65535)
+        valid = (depth > 0) & (depth < 65535)
         nan_number = torch.tensor(np.nan).to('cuda')
         eps_number = torch.tensor(1e-7).to('cuda')
         zero_number = torch.tensor(0.).to('cuda')
-        z = torch.where(valid, depth[0]/1000.0, nan_number) # allways divide with 1000.0
+        z = torch.where(valid, depth/1000.0, nan_number) # allways divide with 1000.0
         x = torch.where(valid, z * (new_c - cx) / fx, nan_number)
         y = torch.where(valid, z * (new_r - cy) / fy, nan_number)
         
 
         dimension = rows * cols
-        z_ok = z.reshape(dimension)
-        x_ok = x.reshape(dimension)
-        y_ok = y.reshape(dimension)
+        z_ok = z.reshape(depth.shape[0],dimension)
+        x_ok = x.reshape(depth.shape[0],dimension)
+        y_ok = y.reshape(depth.shape[0],dimension)
     
         return torch.stack((x_ok,y_ok,z_ok),dim=1) 
 
@@ -218,32 +218,32 @@ class DDDDepthDiff(nn.Module):
             _,_ , H, W = real.shape
             fake = F.interpolate(fake, size=(H, W), mode='bilinear')
         eps = 1e-7
-        real1 = real[0].clone() #real[0].cpu().detach().numpy()
-        fake1 = fake[0].clone() #fake[0].cpu().detach().numpy()
-        max_depth=15000
+        real1 = real[:,0,:,:].clone() #real[0].cpu().detach().numpy()
+        fake1 = fake[:,0,:,:].clone() #fake[0].cpu().detach().numpy()
+        
         real_pcd = self.point_cloud(real1).clone() #* max_depth
-        fake_pcd = self.point_cloud(fake1).clone() * max_depth
+        fake_pcd = self.point_cloud(fake1).clone() 
 
         real_pcd[real_pcd==0] = eps
         fake_pcd[fake_pcd==0] = eps
 
         #######################
-        nan_z_real = real_pcd[:,2].clone()
+        nan_z_real = real_pcd[:,2,:].clone()
         temp_z_real = nan_z_real[~torch.isnan(nan_z_real)]
        
-        nan_z_fake = fake_pcd[:,2].clone()
+        nan_z_fake = fake_pcd[:,2,:].clone()
         temp_z_fake = nan_z_fake[~torch.isnan(nan_z_real)]
         
-        nan_x_real = real_pcd[:,0].clone()
+        nan_x_real = real_pcd[:,0,:].clone()
         temp_x_real = nan_x_real[~torch.isnan(nan_x_real)]
         
-        nan_x_fake = fake_pcd[:,0].clone()
+        nan_x_fake = fake_pcd[:,0,:].clone()
         temp_x_fake = nan_x_fake[~torch.isnan(nan_x_real)]
         
-        nan_y_real = real_pcd[:,1].clone()
+        nan_y_real = real_pcd[:,1,:].clone()
         temp_y_real = nan_y_real[~torch.isnan(nan_y_real)]
         
-        nan_y_fake = fake_pcd[:,1].clone()
+        nan_y_fake = fake_pcd[:,1,:].clone()
         temp_y_fake = nan_y_fake[~torch.isnan(nan_y_real)]
 
         z_real = temp_z_real[~torch.isnan(temp_z_fake)]
@@ -339,7 +339,7 @@ def parse_args():
                       default=1, type=int)
     parser.add_argument('--checkepoch', dest='checkepoch',
                       help='checkepoch to load model',
-                      default=1, type=int)
+                      default=5, type=int)
     parser.add_argument('--checkpoint', dest='checkpoint',
                       help='checkpoint to load model',
                       default=0, type=int)
@@ -546,7 +546,7 @@ if __name__ == '__main__':
     
     grad_factor = 10.
     normal_factor = 1.
-    max_depth=15000
+    max_depth=15000.
     
     for epoch in range(args.start_epoch, args.max_epochs):
         
@@ -574,8 +574,8 @@ if __name__ == '__main__':
             # imgn=img.clone()
             
             img=img/max_depth
-            imgmask=img.clone().squeeze()
-            imgmask=imgmask[0].unsqueeze(0).unsqueeze(0)
+            imgmask=img.clone()
+            imgmask=imgmask[:,0,:,:].unsqueeze(1)
             valid = (imgmask > 0) & (imgmask < 65535)
             nan_number = torch.tensor(np.nan).to('cuda')
             eps_number = torch.tensor(1e-7).to('cuda')
@@ -584,11 +584,11 @@ if __name__ == '__main__':
             # print(torch.max(z))
             
             # zn=z.clone()
-            # z=z/max_depth
+            #z=z/max_depth
 
             optimizer.zero_grad()
             z_fake = dfilt(img)
-            z_fake = torch.where(valid, z_fake, zero_number)
+            z_fake = torch.where(valid, z_fake*max_depth, zero_number)
             
             # print(torch.max(z_fake))
             # z_fake=z_fake/torch.max(z_fake)
@@ -657,7 +657,7 @@ if __name__ == '__main__':
                 img.resize_(data[0].size()).copy_(data[0])
                 z.resize_(data[1].size()).copy_(data[1])
                 # zn=z.clone()
-                # z=z/max_depth
+                z=z/15000
                 z_fake = dfilt(img)
                 _,dloss=d_crit(z_fake,z)
                 # depth_loss = float(img.size(0)) * rmse(z_fake, z)**2
