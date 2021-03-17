@@ -113,3 +113,13 @@
 [epoch  9] RMSE_log: 18816.3750 RMSE: 14.1318
 [epoch  0] loss: nan
 [epoch  0] loss: 0.9428
+[epoch  0] loss: 0.6759
+[epoch  1] loss: 0.7520
+[epoch  2] loss: 0.7558
+[epoch  3] loss: 0.6544
+[epoch  4] loss: 0.5430
+[epoch  5] loss: 0.5749
+[epoch  6] loss: 0.5412
+[epoch  7] loss: 0.5013
+[epoch  8] loss: 0.5569
+[epoch  9] loss: 0.6020
