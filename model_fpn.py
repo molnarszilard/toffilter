@@ -109,17 +109,19 @@ class DFILT(nn.Module):
         # Top-down
         p5 = self.toplayer(c5)
         p4 = self._upsample_add(p5, self.latlayer1(c4))
-        # p4 = self.smooth1(p4)
+        p4 = self.smooth1(p4)
         p3 = self._upsample_add(p4, self.latlayer2(c3))
-        # p3 = self.smooth2(p3)
+        p3 = self.smooth2(p3)
         p2 = self._upsample_add(p3, self.latlayer3(c2))
-        # p2 = self.smooth3(p2)
+        p2 = self.smooth3(p2)
         
         # Top-down predict and refine
-        d5, d4, d3, d2 = self.up1(self.agg1(p5)), self.up2(self.agg2(p4)), self.up3(self.agg3(p3)), self.agg4(p2)
+        a1,a2,a3,a4=self.agg1(p5),self.agg2(p4),self.agg3(p3),self.agg4(p2)
+        d5, d4, d3, d2 = self.up1(a1), self.up2(a2), self.up3(a3), a4
         _,_,H,W = d2.size()
-        vol = torch.cat( [ F.upsample(d, size=(H,W), mode='bilinear') for d in [d5,d4,d3,d2] ], dim=1 )
+        vol = torch.cat( [ F.upsample(d, size=(H*4,W*4), mode='bilinear') for d in [d5,d4,d3,d2] ], dim=1 )
         
         pred1 = self.predict1(vol)
-        pred2 = F.interpolate(self.predict2(pred1), size=(H*4,W*4), mode='bilinear')
-        return pred2 
+        # pred2 = F.interpolate(self.predict2(pred1), size=(H*4,W*4), mode='bilinear')
+        pred2 = self.predict2(pred1)
+        return pred2

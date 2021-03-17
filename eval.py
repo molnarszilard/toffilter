@@ -32,7 +32,7 @@ def parse_args():
                       default=False, type=bool)
     parser.add_argument('--model_path', dest='model_path',
                       help='path to the model to use',
-                      default='saved_models/dfilt_1_9_v7.pth', type=str)
+                      default='saved_models/dfilt_1_9_v8.pth', type=str)
 
     args = parser.parse_args()
     return args
@@ -90,9 +90,9 @@ if __name__ == '__main__':
                     depth = combine_depth
                 depth2 = np.moveaxis(depth,-1,0)
                 img = torch.from_numpy(depth2).float().unsqueeze(0).cuda()
-                max_depth=torch.max(img)
+                max_depth=15000
                 start = timeit.default_timer()
-                img=img/torch.max(img)
+                img=img/max_depth
                 imgmask=img.clone().squeeze()
                 imgmask=imgmask[0].unsqueeze(0).unsqueeze(0)
                 valid = (imgmask > 0) & (imgmask < 65535)

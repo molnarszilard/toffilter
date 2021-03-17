@@ -220,9 +220,9 @@ class DDDDepthDiff(nn.Module):
         eps = 1e-7
         real1 = real[0].clone() #real[0].cpu().detach().numpy()
         fake1 = fake[0].clone() #fake[0].cpu().detach().numpy()
-        
-        real_pcd = self.point_cloud(real1).clone() * 1000.0
-        fake_pcd = self.point_cloud(fake1).clone() * 1000.0
+        max_depth=15000
+        real_pcd = self.point_cloud(real1).clone() #* max_depth
+        fake_pcd = self.point_cloud(fake1).clone() * max_depth
 
         real_pcd[real_pcd==0] = eps
         fake_pcd[fake_pcd==0] = eps
@@ -314,7 +314,7 @@ def parse_args():
                       default=1e-3, type=float)
     parser.add_argument('--lr_decay_step', dest='lr_decay_step',
                       help='step to do learning rate decay, unit is epoch',
-                      default=3, type=int)
+                      default=2, type=int)
     parser.add_argument('--lr_decay_gamma', dest='lr_decay_gamma',
                       help='learning rate decay ratio',
                       default=0.1, type=float)
@@ -546,6 +546,7 @@ if __name__ == '__main__':
     
     grad_factor = 10.
     normal_factor = 1.
+    max_depth=15000
     
     for epoch in range(args.start_epoch, args.max_epochs):
         
@@ -570,8 +571,9 @@ if __name__ == '__main__':
             
             img.resize_(data[0].size()).copy_(data[0])
             z.resize_(data[1].size()).copy_(data[1])
-            imgn=img.clone()
-            imgn=imgn/torch.max(imgn)
+            # imgn=img.clone()
+            
+            img=img/max_depth
             imgmask=img.clone().squeeze()
             imgmask=imgmask[0].unsqueeze(0).unsqueeze(0)
             valid = (imgmask > 0) & (imgmask < 65535)
@@ -580,12 +582,12 @@ if __name__ == '__main__':
             zero_number = torch.tensor(0.).to('cuda')
             # print(step)
             # print(torch.max(z))
-            max_depth=1*torch.max(z).cpu().detach().numpy()
-            zn=z.clone()
-            zn=zn/torch.max(zn)
+            
+            # zn=z.clone()
+            # z=z/max_depth
 
             optimizer.zero_grad()
-            z_fake = dfilt(imgn)
+            z_fake = dfilt(img)
             z_fake = torch.where(valid, z_fake, zero_number)
             
             # print(torch.max(z_fake))
@@ -600,7 +602,7 @@ if __name__ == '__main__':
             # input_pcd = d_crit.point_cloud(input_depth[0]).cpu().detach().numpy()
             # o3d_pcd.points = o3d.utility.Vector3dVector(input_pcd*max_depth)
             # o3d.io.write_point_cloud(args.output_dir+"/input_cloud"+str(epoch)+".pcd", o3d_pcd)
-            _,dloss=d_crit(z_fake,zn)
+            _,dloss=d_crit(z_fake,z)
             # print(dloss)
             # grad_real, grad_fake = imgrad_yx(z), imgrad_yx(z_fake)
             # grad_loss = grad_criterion(grad_fake, grad_real)     * grad_factor * (epoch>3)
@@ -622,7 +624,7 @@ if __name__ == '__main__':
                 print("[epoch %2d][iter %4d] loss: %.4f " \
                                 % (epoch, step, loss))
         # save model
-        if epoch%5==0 or epoch==args.max_epochs-1:
+        if epoch%1==0 or epoch==args.max_epochs-1:
             save_name = os.path.join(args.output_dir, 'dfilt_{}_{}.pth'.format(args.session, epoch))
             torch.save({'epoch': epoch+1,
                     'model': dfilt.state_dict(), 
@@ -654,10 +656,10 @@ if __name__ == '__main__':
 
                 img.resize_(data[0].size()).copy_(data[0])
                 z.resize_(data[1].size()).copy_(data[1])
-                zn=z.clone()
-                zn=zn/torch.max(zn)
+                # zn=z.clone()
+                # z=z/max_depth
                 z_fake = dfilt(img)
-                _,dloss=d_crit(z_fake,zn)
+                _,dloss=d_crit(z_fake,z)
                 # depth_loss = float(img.size(0)) * rmse(z_fake, z)**2
                 eval_loss += dloss
                 # rmse_accum += float(img.size(0)) * eval_metric(z_fake, z)**2
@@ -666,7 +668,7 @@ if __name__ == '__main__':
             print("[epoch %2d] loss: %.4f " \
                             % (epoch, torch.sqrt(eval_loss/count)))
             with open('val.txt', 'a') as f:
-                f.write("[epoch %2d] loss: %.4f RMSE: %.4f\n" \
+                f.write("[epoch %2d] loss: %.4f\n" \
                             % (epoch, torch.sqrt(eval_loss/count)))
 
        
