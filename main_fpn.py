@@ -113,56 +113,6 @@ class NormalLoss(nn.Module):
         
         return 1 - torch.mean( prod/(fake_norm*real_norm) )
 
-
-class PointLoss(nn.Module):
-    def __init__(self):
-        super(PointLoss, self).__init__()
-        
-    
-    def forward(self, depth_fake, depth_real):
-        # K[9] = {460.58518931365654, 0.0, 334.0805877590529, 0.0, 460.2679961517268, 169.80766383231037, 0.0, 0.0, 1.0} # pico zense
-        K = [582.62448167737955, 0.0, 313.04475870804731, 0.0, 582.69103270988637, 238.44389626620386, 0.0, 0.0, 1.0] # nyu_v2_dataset
-        # K = [582.624, 0.0, 313.044, 0.0, 582.691, 238.443, 0.0, 0.0, 1.0] # nyu_v2_dataset
-        fx = K[0]
-        fy = K[4]
-        x0 = K[2]
-        y0 = K[5]
-        rows, cols = depth_real[0][0].shape
-        c, _ = torch.meshgrid(torch.arange(cols), torch.arange(cols))
-        c = torch.meshgrid(torch.arange(cols))
-        new_c = c[0].reshape([1,cols]).to('cuda')
-        r = torch.meshgrid(torch.arange(rows))
-        new_r = r[0].unsqueeze(-1).to('cuda')
-        valid_real = (depth_real[0] > 0) & (depth_real[0] < 65535)
-        valid_fake = (depth_fake[0] > 0) & (depth_fake[0] < 65535)
-        nan_number = torch.tensor(np.nan).to('cuda')
-        eps_number = torch.tensor(1e-7).to('cuda')
-        zero_number = torch.tensor(0.).to('cuda')
-        max_loss = torch.tensor(10000.).to('cuda')
-
-        real_z = torch.where(valid_real, depth_real[0]/1000., eps_number)
-        real_x = torch.where(valid_real, real_z * (new_c - x0) / fx, eps_number)
-        real_y = torch.where(valid_real, real_z * (new_r - y0) / fy, eps_number)
-
-        fake_z = torch.where(valid_fake, depth_fake[0]/1000., eps_number)
-        fake_x = torch.where(valid_fake, fake_z * (new_c - x0) / fx, eps_number)
-        fake_y = torch.where(valid_fake, fake_z * (new_r - y0) / fy, eps_number)
-
-        lossZ=torch.mean(((real_z-fake_z).pow(2)).pow(0.5))
-        lossX=torch.mean(((real_x-fake_x).pow(2)).pow(0.5))
-        lossY=torch.mean(((real_y-fake_y).pow(2)).pow(0.5))
-
-        # RMSE_log = torch.sqrt(torch.mean(torch.abs(torch.log(torch.abs(real_z))-torch.log(torch.abs(fake_z)))**2))
-       
-        # delta = [RMSE_log, lossX, lossY, lossZ]
-        loss = 10 * torch.abs(10*(3-torch.exp(1*lossX)-torch.exp(1*lossY)-torch.exp(1*lossZ)))
-        # while loss>max_loss:
-        #     loss=loss/10.
-        # loss = (lossX+lossY+lossZ)*100
-        return loss
-
-
-
 class DDDDepthDiff(nn.Module):
     def __init__(self):
         super(DDDDepthDiff, self).__init__()
