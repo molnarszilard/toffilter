@@ -152,10 +152,10 @@ class PointLoss(nn.Module):
         lossX=torch.mean(((real_x-fake_x).pow(2)).pow(0.5))
         lossY=torch.mean(((real_y-fake_y).pow(2)).pow(0.5))
 
-        RMSE_log = torch.sqrt(torch.mean(torch.abs(torch.log(torch.abs(real_z))-torch.log(torch.abs(fake_z)))**2))
+        # RMSE_log = torch.sqrt(torch.mean(torch.abs(torch.log(torch.abs(real_z))-torch.log(torch.abs(fake_z)))**2))
        
         # delta = [RMSE_log, lossX, lossY, lossZ]
-        loss = 10*RMSE_log * torch.abs(10*(3-torch.exp(1*lossX)-torch.exp(1*lossY)-torch.exp(1*lossZ)))
+        loss = 10 * torch.abs(10*(3-torch.exp(1*lossX)-torch.exp(1*lossY)-torch.exp(1*lossZ)))
         # while loss>max_loss:
         #     loss=loss/10.
         # loss = (lossX+lossY+lossZ)*100
@@ -197,7 +197,7 @@ class DDDDepthDiff(nn.Module):
         new_c = c[0].reshape([1,cols]).to('cuda')
         r = torch.meshgrid(torch.arange(rows))
         new_r = r[0].unsqueeze(-1).to('cuda')
-        valid = (depth > 0) & (depth < 65535)
+        valid = (depth > 0) & (depth < 10001)
         nan_number = torch.tensor(np.nan).to('cuda')
         eps_number = torch.tensor(1e-7).to('cuda')
         zero_number = torch.tensor(0.).to('cuda')
@@ -314,7 +314,7 @@ def parse_args():
                       default=1e-3, type=float)
     parser.add_argument('--lr_decay_step', dest='lr_decay_step',
                       help='step to do learning rate decay, unit is epoch',
-                      default=2, type=int)
+                      default=3, type=int)
     parser.add_argument('--lr_decay_gamma', dest='lr_decay_gamma',
                       help='learning rate decay ratio',
                       default=0.1, type=float)
@@ -339,7 +339,7 @@ def parse_args():
                       default=1, type=int)
     parser.add_argument('--checkepoch', dest='checkepoch',
                       help='checkepoch to load model',
-                      default=5, type=int)
+                      default=8, type=int)
     parser.add_argument('--checkpoint', dest='checkpoint',
                       help='checkpoint to load model',
                       default=0, type=int)
@@ -546,7 +546,7 @@ if __name__ == '__main__':
     
     grad_factor = 10.
     normal_factor = 1.
-    max_depth=15000.
+    max_depth=10000.
     
     for epoch in range(args.start_epoch, args.max_epochs):
         
@@ -572,11 +572,13 @@ if __name__ == '__main__':
             img.resize_(data[0].size()).copy_(data[0])
             z.resize_(data[1].size()).copy_(data[1])
             # imgn=img.clone()
-            
-            img=img/max_depth
-            imgmask=img.clone()
+            # print(torch.max(img))
+            img2=img.clone()
+            img2[img2>max_depth] = max_depth            
+            imgmask=img2.clone()
             imgmask=imgmask[:,0,:,:].unsqueeze(1)
-            valid = (imgmask > 0) & (imgmask < 65535)
+            valid = (imgmask > 0) & (imgmask < max_depth+1)
+            img2=img2/max_depth
             nan_number = torch.tensor(np.nan).to('cuda')
             eps_number = torch.tensor(1e-7).to('cuda')
             zero_number = torch.tensor(0.).to('cuda')
@@ -587,7 +589,7 @@ if __name__ == '__main__':
             #z=z/max_depth
 
             optimizer.zero_grad()
-            z_fake = dfilt(img)
+            z_fake = dfilt(img2)
             z_fake = torch.where(valid, z_fake*max_depth, zero_number)
             
             # print(torch.max(z_fake))
@@ -656,9 +658,13 @@ if __name__ == '__main__':
 
                 img.resize_(data[0].size()).copy_(data[0])
                 z.resize_(data[1].size()).copy_(data[1])
-                # zn=z.clone()
-                z=z/15000
-                z_fake = dfilt(img)
+                img2=img.clone()
+                img2[img2>max_depth] = max_depth            
+                imgmask=img2.clone()
+                imgmask=imgmask[:,0,:,:].unsqueeze(1)
+                valid = (imgmask > 0) & (imgmask < max_depth+1)
+                img2=img2/max_depth
+                z_fake = dfilt(img2)
                 _,dloss=d_crit(z_fake,z)
                 # depth_loss = float(img.size(0)) * rmse(z_fake, z)**2
                 eval_loss += dloss

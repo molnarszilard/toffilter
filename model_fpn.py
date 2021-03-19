@@ -42,8 +42,12 @@ class DFILT(nn.Module):
         if fixed_feature_weights:
             for p in resnet.parameters():
                 p.requires_grad = False
-
+        self.layer01=nn.Conv2d(3, 64, kernel_size=(7, 7), stride=(2,2), padding=(3, 3), bias=False)
+        self.layer02=nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        self.layer03=nn.ReLU(inplace=True)
+        self.layer04=nn.MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
         self.layer0 = nn.Sequential(resnet.conv1, resnet.bn1, resnet.relu, resnet.maxpool)
+        # self.layer0=nn.Sequential(self.layer01,self.layer02,self.layer03,self.layer04)
         self.layer1 = nn.Sequential(resnet.layer1)
         self.layer2 = nn.Sequential(resnet.layer2)
         self.layer3 = nn.Sequential(resnet.layer3)

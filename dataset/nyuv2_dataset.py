@@ -19,11 +19,11 @@ class NYUv2Dataset(data.Dataset):
         self.root = Path(root)
         self.train = train
         if train:
-            self.rgb_paths = [root+'depth3/train/'+d for d in os.listdir(root+'depth3/train/')]
+            self.rgb_paths = [root+'depth3/'+d for d in os.listdir(root+'depth3/')]
             # Randomly choose 50k images without replacement
-            self.rgb_paths = np.random.choice(self.rgb_paths, 10000, False)
+            self.rgb_paths = np.random.choice(self.rgb_paths, 4000, False)
         else:
-            self.rgb_paths = [root+'depth3/test/'+d for d in os.listdir(root+'depth3/test/')]
+            self.rgb_paths = [root+'depth3/'+d for d in os.listdir(root+'depth3/')]
             self.rgb_paths = np.random.choice(self.rgb_paths, 1, False)
         
 
