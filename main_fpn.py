@@ -217,7 +217,7 @@ class DDDDepthDiff(nn.Module):
        
         delta = [RMSE_log, lossX, lossY, lossZ]
         # loss = 10 *RMSE_log* torch.abs(10*(3-torch.exp(1*lossX)-torch.exp(1*lossY)-torch.exp(1*lossZ)))
-        loss = 10 * torch.abs(10*(3-torch.exp(1*lossX)-torch.exp(1*lossY)-torch.exp(1*lossZ))) #v14
+        loss = 10 * torch.abs(10*(3-torch.exp(1*lossX)-torch.exp(1*lossY)-torch.exp(1*lossZ))) #v14 distance = 0.055079
         # loss = (lossX+lossY+lossZ)*100 #v15 distance = 0.105806
         # loss = lossD #v16 distance=0.078502
         # loss = RMSE_log*100 #v17 distance=0.123481
@@ -501,7 +501,12 @@ if __name__ == '__main__':
     grad_factor = 10.
     normal_factor = 1.
     max_depth=10000.
-    
+    min_depth=300.
+    min_value=10000
+    max_value=0
+    nan_number = torch.tensor(np.nan).to('cuda')
+    eps_number = torch.tensor(1e-7).to('cuda')
+    zero_number = torch.tensor(0.).to('cuda')
     for epoch in range(args.start_epoch, args.max_epochs):
         
         # setting to train mode
@@ -520,22 +525,34 @@ if __name__ == '__main__':
         train_data_iter = iter(train_dataloader)
         
         for step in range(iters_per_epoch):
+            # print(min_value)
+            # print(max_value)
             start = time.time()
             data = train_data_iter.next()
             
             img.resize_(data[0].size()).copy_(data[0])
+            
             z.resize_(data[1].size()).copy_(data[1])
             # imgn=img.clone()
             # print(torch.max(img))
-            img2=img.clone()
-            img2[img2>max_depth] = max_depth            
-            imgmask=img2.clone()
-            imgmask=imgmask[:,0,:,:].unsqueeze(1)
+            # img2=img.clone()
+            # img2[img2>max_depth] = max_depth     
+            # img2[img2==0] = torch.max(img2)
+            # if torch.max(img2)>max_value:
+            #     max_value=torch.max(img2)
+            # if torch.min(img2)<min_value:
+            #     min_value=torch.min(img2) 
+            #print(torch.min(img2))
+            img3=img.clone()
+
+            imgmask=img3.clone()
+            
             valid = (imgmask > 0) & (imgmask < max_depth+1)
-            img2=img2/max_depth
-            nan_number = torch.tensor(np.nan).to('cuda')
-            eps_number = torch.tensor(1e-7).to('cuda')
-            zero_number = torch.tensor(0.).to('cuda')
+            img3[img3<min_depth] = zero_number
+            img3[img3>max_depth] = max_depth
+            img3=img3-min_depth
+            img3=img3/(max_depth-min_depth)
+            valid=valid[:,0,:,:].unsqueeze(1)
             # print(step)
             # print(torch.max(z))
             
@@ -543,8 +560,8 @@ if __name__ == '__main__':
             #z=z/max_depth
 
             optimizer.zero_grad()
-            z_fake = dfilt(img2)
-            z_fake = torch.where(valid, z_fake*max_depth, zero_number)
+            z_fake = dfilt(img3)
+            z_fake = torch.where(valid, z_fake*(max_depth-min_depth)+min_depth, zero_number)
             
             # print(torch.max(z_fake))
             # z_fake=z_fake/torch.max(z_fake)

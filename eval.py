@@ -32,7 +32,7 @@ def parse_args():
                       default=True, type=bool)
     parser.add_argument('--model_path', dest='model_path',
                       help='path to the model to use',
-                      default='saved_models/dfilt_1_9_v14.pth', type=str)
+                      default='saved_models/dfilt_1_9_v18.pth', type=str)
 
     args = parser.parse_args()
     return args
@@ -76,6 +76,9 @@ if __name__ == '__main__':
         dlist.sort()
         time_sum = 0
         counter = 0
+        nan_number = torch.tensor(np.nan).to('cuda')
+        eps_number = torch.tensor(1e-7).to('cuda')
+        zero_number = torch.tensor(0.).to('cuda')
         for filename in dlist:
             if filename.endswith(".png"):
                 path=args.input_image_path+filename
@@ -91,16 +94,18 @@ if __name__ == '__main__':
                 depth2 = np.moveaxis(depth,-1,0)
                 img = torch.from_numpy(depth2).float().unsqueeze(0).cuda()
                 max_depth=10000.
+                min_depth=300.
                 start = timeit.default_timer()
                 img2=img.clone()
-                img2[img2>max_depth] = max_depth            
+                img2[img2>max_depth] = max_depth
+                img2[img2<min_depth] = zero_number
                 imgmask=img2.clone()
                 imgmask=imgmask[:,0,:,:].unsqueeze(1)
                 valid = (imgmask > 0) & (imgmask < max_depth+1)
-                img2=img2/max_depth                
-                zero_number = torch.tensor(0.).to('cuda')        
+                img2=img2-min_depth
+                img2=img2/                      
                 z_fake = dfilt(img2)
-                z_fake = torch.where(valid, z_fake*max_depth, zero_number)
+                z_fake = torch.where(valid, z_fake*(max_depth-min_depth)+min_depth, zero_number)
                 stop = timeit.default_timer()
                 time_sum=time_sum+stop-start
                 counter=counter+1
