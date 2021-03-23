@@ -129,8 +129,8 @@ class DDDDepthDiff(nn.Module):
 
         """
         # depth is of shape (1,480,640)
-        # K[9] = {460.58518931365654, 0.0, 334.0805877590529, 0.0, 460.2679961517268, 169.80766383231037, 0.0, 0.0, 1.0} # pico zense
-        K = [582.62448167737955, 0.0, 313.04475870804731, 0.0, 582.69103270988637, 238.44389626620386, 0.0, 0.0, 1.0] # nyu_v2_dataset
+        K = [460.58518931365654, 0.0, 334.0805877590529, 0.0, 460.2679961517268, 169.80766383231037, 0.0, 0.0, 1.0] # pico zense
+        # K = [582.62448167737955, 0.0, 313.04475870804731, 0.0, 582.69103270988637, 238.44389626620386, 0.0, 0.0, 1.0] # nyu_v2_dataset
         # K = [582.624, 0.0, 313.045, 0.0, 582.691, 238.444, 0.0, 0.0, 1.0] # nyu_v2_dataset
         fx = K[0]
         fy = K[4]
@@ -218,6 +218,7 @@ class DDDDepthDiff(nn.Module):
         delta = [RMSE_log, lossX, lossY, lossZ]
         loss = 10 *RMSE_log* torch.abs(10*(3-torch.exp(1*lossX)-torch.exp(1*lossY)-torch.exp(1*lossZ)))
         #v19 distance = 0.067836
+        #v20-pico, distance = 0.082979
         # loss = 10 * torch.abs(10*(3-torch.exp(1*lossX)-torch.exp(1*lossY)-torch.exp(1*lossZ))) #v14 distance = 0.055079
         # v18 distance = 0.069045
         # loss = (lossX+lossY+lossZ)*100 #v15 distance = 0.105806
@@ -502,7 +503,7 @@ if __name__ == '__main__':
     
     grad_factor = 10.
     normal_factor = 1.
-    max_depth=10000.
+    max_depth=6000.
     min_depth=300.
     min_value=10000
     max_value=0
@@ -553,7 +554,7 @@ if __name__ == '__main__':
             
             # img3=img3-min_depth
             m_depth=torch.max(img3)
-            img3=img3/m_depth#(max_depth-min_depth)
+            img3=img3/max_depth#(max_depth-min_depth)
             valid=valid[:,0,:,:].unsqueeze(1)
             # print(step)
             # print(torch.max(z))
@@ -563,7 +564,7 @@ if __name__ == '__main__':
 
             optimizer.zero_grad()
             z_fake = dfilt(img3)
-            z_fake = torch.where(valid, z_fake*m_depth, zero_number)
+            z_fake = torch.where(valid, z_fake*max_depth, zero_number)
             
             # print(torch.max(z_fake))
             # z_fake=z_fake/torch.max(z_fake)
@@ -638,6 +639,7 @@ if __name__ == '__main__':
                 valid = (imgmask > 0) & (imgmask < max_depth+1)
                 img2=img2/max_depth
                 z_fake = dfilt(img2)
+                z_fake=torch.where(valid,z_fake*max_depth,zero_number)
                 _,dloss=d_crit(z_fake,z)
                 # depth_loss = float(img.size(0)) * rmse(z_fake, z)**2
                 eval_loss += dloss

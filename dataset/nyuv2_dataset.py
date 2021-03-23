@@ -13,7 +13,8 @@ import cv2
 
     
 class NYUv2Dataset(data.Dataset):
-    def __init__(self, root='/media/rambo/ssd2/Szilard/nyu_v2_filter/dataset/', seed=None, train=True):
+    # def __init__(self, root='/media/rambo/ssd2/Szilard/nyu_v2_filter/dataset/', seed=None, train=True):
+    def __init__(self, root='/media/rambo/ssd2/Szilard/pico_tofnest/1bag_augmented/dataset_filter/', seed=None, train=True):
         
         np.random.seed(seed)
         self.root = Path(root)
@@ -28,8 +29,8 @@ class NYUv2Dataset(data.Dataset):
         
 
         self.augmentation = Compose([RandomHorizontalFlip()]) # , RandomCropRotate(10)
-        self.rgb_transform = Compose([ToPILImage(), Resize((480,640)), ToTensor()]) # ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1), 
-        self.depth_transform = Compose([ToPILImage(), Resize((480,640)), ToTensor()])
+        self.rgb_transform = Compose([ToPILImage(), Resize((360,640)), ToTensor()]) # ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1), 
+        self.depth_transform = Compose([ToPILImage(), Resize((360,640)), ToTensor()])
         
         if self.train:
             self.length = len(self.rgb_paths)
