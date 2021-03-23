@@ -103,7 +103,7 @@ if __name__ == '__main__':
                 imgmask=imgmask[:,0,:,:].unsqueeze(1)
                 valid = (imgmask > 0) & (imgmask < max_depth+1)
                 img2=img2-min_depth
-                img2=img2/                      
+                img2=img2/(max_depth-min_depth)                 
                 z_fake = dfilt(img2)
                 z_fake = torch.where(valid, z_fake*(max_depth-min_depth)+min_depth, zero_number)
                 stop = timeit.default_timer()
