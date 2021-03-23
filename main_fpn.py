@@ -210,13 +210,18 @@ class DDDDepthDiff(nn.Module):
         lossX = torch.mean(torch.abs(x_real-x_fake))
         lossZ = torch.mean(torch.abs(z_real-z_fake))
         lossY = torch.mean(torch.abs(y_real-y_fake))
+
+        lossD = torch.mean(torch.abs(real1-fake1))
        
         RMSE_log = torch.sqrt(torch.mean(torch.abs(torch.log(torch.abs(z_real))-torch.log(torch.abs(z_fake)))**2))
        
         delta = [RMSE_log, lossX, lossY, lossZ]
-        loss17 = 10*RMSE_log * torch.abs(10*(3-torch.exp(1*lossX)-torch.exp(1*lossY)-torch.exp(1*lossZ)))
-   
-        return delta, loss17
+        # loss = 10 *RMSE_log* torch.abs(10*(3-torch.exp(1*lossX)-torch.exp(1*lossY)-torch.exp(1*lossZ)))
+        loss = 10 * torch.abs(10*(3-torch.exp(1*lossX)-torch.exp(1*lossY)-torch.exp(1*lossZ))) #v14
+        # loss = (lossX+lossY+lossZ)*100 #v15 distance = 0.105806
+        # loss = lossD #v16 distance=0.078502
+        # loss = RMSE_log*100 #v17 distance=0.123481
+        return delta, loss
 # def get_acc(output, target):
 #     # takes in two tensors to compute accuracy
 #     pred = output.data.max(1, keepdim=True)[1] # get the index of the max log-probability
@@ -468,7 +473,6 @@ if __name__ == '__main__':
     depth_criterion = RMSE_log()
     grad_criterion = GradLoss()
     normal_criterion = NormalLoss()
-    point_criterion = PointLoss()
     d_crit=DDDDepthDiff()
     eval_metric = RMSE_log()
     
