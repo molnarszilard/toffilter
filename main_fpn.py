@@ -216,8 +216,10 @@ class DDDDepthDiff(nn.Module):
         RMSE_log = torch.sqrt(torch.mean(torch.abs(torch.log(torch.abs(z_real))-torch.log(torch.abs(z_fake)))**2))
        
         delta = [RMSE_log, lossX, lossY, lossZ]
-        # loss = 10 *RMSE_log* torch.abs(10*(3-torch.exp(1*lossX)-torch.exp(1*lossY)-torch.exp(1*lossZ)))
-        loss = 10 * torch.abs(10*(3-torch.exp(1*lossX)-torch.exp(1*lossY)-torch.exp(1*lossZ))) #v14 distance = 0.055079
+        loss = 10 *RMSE_log* torch.abs(10*(3-torch.exp(1*lossX)-torch.exp(1*lossY)-torch.exp(1*lossZ)))
+        #v19 distance = 0.067836
+        # loss = 10 * torch.abs(10*(3-torch.exp(1*lossX)-torch.exp(1*lossY)-torch.exp(1*lossZ))) #v14 distance = 0.055079
+        # v18 distance = 0.069045
         # loss = (lossX+lossY+lossZ)*100 #v15 distance = 0.105806
         # loss = lossD #v16 distance=0.078502
         # loss = RMSE_log*100 #v17 distance=0.123481
@@ -544,14 +546,14 @@ if __name__ == '__main__':
             #     min_value=torch.min(img2) 
             #print(torch.min(img2))
             img3=img.clone()
-
-            imgmask=img3.clone()
-            
-            valid = (imgmask > 0) & (imgmask < max_depth+1)
             img3[img3<min_depth] = zero_number
             img3[img3>max_depth] = max_depth
-            img3=img3-min_depth
-            img3=img3/(max_depth-min_depth)
+            imgmask=img3.clone()            
+            valid = (imgmask > 0) & (imgmask < max_depth+1)
+            
+            # img3=img3-min_depth
+            m_depth=torch.max(img3)
+            img3=img3/m_depth#(max_depth-min_depth)
             valid=valid[:,0,:,:].unsqueeze(1)
             # print(step)
             # print(torch.max(z))
@@ -561,7 +563,7 @@ if __name__ == '__main__':
 
             optimizer.zero_grad()
             z_fake = dfilt(img3)
-            z_fake = torch.where(valid, z_fake*(max_depth-min_depth)+min_depth, zero_number)
+            z_fake = torch.where(valid, z_fake*m_depth, zero_number)
             
             # print(torch.max(z_fake))
             # z_fake=z_fake/torch.max(z_fake)
