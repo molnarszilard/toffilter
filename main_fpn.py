@@ -171,8 +171,8 @@ class DDDDepthDiff(nn.Module):
         real1 = real[:,0,:,:].clone() #real[0].cpu().detach().numpy()
         fake1 = fake[:,0,:,:].clone() #fake[0].cpu().detach().numpy()
         
-        real_pcd = self.point_cloud(real1).clone() #* max_depth
-        fake_pcd = self.point_cloud(fake1).clone() 
+        real_pcd = self.point_cloud(real1).clone() * 1000.
+        fake_pcd = self.point_cloud(fake1).clone() * 1000.
 
         real_pcd[real_pcd==0] = eps
         fake_pcd[fake_pcd==0] = eps
@@ -218,7 +218,7 @@ class DDDDepthDiff(nn.Module):
         delta = [RMSE_log, lossX, lossY, lossZ]
         loss = 10 *RMSE_log* torch.abs(10*(3-torch.exp(1*lossX)-torch.exp(1*lossY)-torch.exp(1*lossZ)))
         #v19 distance = 0.067836
-        #v20-pico, distance = 0.082979
+        #v20-pico, distance = 0.054325
         # loss = 10 * torch.abs(10*(3-torch.exp(1*lossX)-torch.exp(1*lossY)-torch.exp(1*lossZ))) #v14 distance = 0.055079
         # v18 distance = 0.069045
         # loss = (lossX+lossY+lossZ)*100 #v15 distance = 0.105806
@@ -534,8 +534,10 @@ if __name__ == '__main__':
             data = train_data_iter.next()
             
             img.resize_(data[0].size()).copy_(data[0])
-            
             z.resize_(data[1].size()).copy_(data[1])
+            optimizer.zero_grad()
+
+
             # imgn=img.clone()
             # print(torch.max(img))
             # img2=img.clone()
@@ -546,25 +548,20 @@ if __name__ == '__main__':
             # if torch.min(img2)<min_value:
             #     min_value=torch.min(img2) 
             #print(torch.min(img2))
-            img3=img.clone()
-            img3[img3<min_depth] = zero_number
-            img3[img3>max_depth] = max_depth
-            imgmask=img3.clone()            
+            img2=img.clone()
+            img2[img2<min_depth] = zero_number
+            img2[img2>max_depth] = max_depth
+            imgmask=img2.clone()       
+            imgmask=imgmask[:,0,:,:].unsqueeze(1)     
             valid = (imgmask > 0) & (imgmask < max_depth+1)
             
             # img3=img3-min_depth
-            m_depth=torch.max(img3)
-            img3=img3/max_depth#(max_depth-min_depth)
-            valid=valid[:,0,:,:].unsqueeze(1)
-            # print(step)
-            # print(torch.max(z))
-            
-            # zn=z.clone()
-            #z=z/max_depth
-
-            optimizer.zero_grad()
-            z_fake = dfilt(img3)
-            z_fake = torch.where(valid, z_fake*max_depth, zero_number)
+            m_depth=torch.max(img2)
+            img2=img2/max_depth#(max_depth-min_depth)
+            z=z/max_depth
+           
+            z_fake = dfilt(img2)
+            z_fake = torch.where(valid, z_fake, zero_number)
             
             # print(torch.max(z_fake))
             # z_fake=z_fake/torch.max(z_fake)
@@ -633,18 +630,24 @@ if __name__ == '__main__':
                 img.resize_(data[0].size()).copy_(data[0])
                 z.resize_(data[1].size()).copy_(data[1])
                 img2=img.clone()
-                img2[img2>max_depth] = max_depth            
-                imgmask=img2.clone()
-                imgmask=imgmask[:,0,:,:].unsqueeze(1)
+                img2[img2<min_depth] = zero_number
+                img2[img2>max_depth] = max_depth
+                imgmask=img2.clone()            
                 valid = (imgmask > 0) & (imgmask < max_depth+1)
-                img2=img2/max_depth
+                
+                # img3=img3-min_depth
+                m_depth=torch.max(img2)
+                img2=img2/max_depth#(max_depth-min_depth)
+                z=z/max_depth
+                valid=valid[:,0,:,:].unsqueeze(1)
                 z_fake = dfilt(img2)
-                z_fake=torch.where(valid,z_fake*max_depth,zero_number)
+                z_fake=torch.where(valid,z_fake,zero_number)
+                z=z/max_depth
                 _,dloss=d_crit(z_fake,z)
                 # depth_loss = float(img.size(0)) * rmse(z_fake, z)**2
                 eval_loss += dloss
                 # rmse_accum += float(img.size(0)) * eval_metric(z_fake, z)**2
-                count += float(img.size(0))
+                count += float(img2.size(0))
 
             print("[epoch %2d] loss: %.4f " \
                             % (epoch, torch.sqrt(eval_loss/count)))
