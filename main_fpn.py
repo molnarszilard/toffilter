@@ -558,10 +558,11 @@ if __name__ == '__main__':
             # img3=img3-min_depth
             m_depth=torch.max(img2)
             img2=img2/max_depth#(max_depth-min_depth)
-            z=z/max_depth
+            z=z/torch.max(z)#max_depth
            
             z_fake = dfilt(img2)
-            z_fake = torch.where(valid, z_fake, zero_number)
+            z_fake_max=torch.max(z_fake)
+            z_fake = torch.where(valid, z_fake/z_fake_max, zero_number)
             
             # print(torch.max(z_fake))
             # z_fake=z_fake/torch.max(z_fake)
@@ -638,11 +639,11 @@ if __name__ == '__main__':
                 # img3=img3-min_depth
                 m_depth=torch.max(img2)
                 img2=img2/max_depth#(max_depth-min_depth)
-                z=z/max_depth
+                z=z/torch.max(z)#max_depth
                 valid=valid[:,0,:,:].unsqueeze(1)
                 z_fake = dfilt(img2)
-                z_fake=torch.where(valid,z_fake,zero_number)
-                z=z/max_depth
+                z_fake_max=torch.max(z_fake)
+                z_fake=torch.where(valid,z_fake/z_fake_max,zero_number)
                 _,dloss=d_crit(z_fake,z)
                 # depth_loss = float(img.size(0)) * rmse(z_fake, z)**2
                 eval_loss += dloss
