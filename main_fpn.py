@@ -151,7 +151,7 @@ class DDDDepthDiff(nn.Module):
         nan_number = torch.tensor(np.nan).to('cuda')
         eps_number = torch.tensor(1e-7).to('cuda')
         zero_number = torch.tensor(0.).to('cuda')
-        z = torch.where(valid, depth/1000.0, nan_number) # allways divide with 1000.0
+        z = torch.where(valid, depth, nan_number) # allways divide with 1000.0
         x = torch.where(valid, z * (new_c - cx) / fx, nan_number)
         y = torch.where(valid, z * (new_r - cy) / fy, nan_number)
         
@@ -171,8 +171,8 @@ class DDDDepthDiff(nn.Module):
         real1 = real[:,0,:,:].clone() #real[0].cpu().detach().numpy()
         fake1 = fake[:,0,:,:].clone() #fake[0].cpu().detach().numpy()
         
-        real_pcd = self.point_cloud(real1).clone() * 1000.
-        fake_pcd = self.point_cloud(fake1).clone() * 1000.
+        real_pcd = self.point_cloud(real1).clone()
+        fake_pcd = self.point_cloud(fake1).clone()
 
         real_pcd[real_pcd==0] = eps
         fake_pcd[fake_pcd==0] = eps
