@@ -129,9 +129,9 @@ class DDDDepthDiff(nn.Module):
 
         """
         # depth is of shape (1,480,640)
-        K = [460.58518931365654, 0.0, 334.0805877590529, 0.0, 460.2679961517268, 169.80766383231037, 0.0, 0.0, 1.0] # pico zense
+        # K = [460.58518931365654, 0.0, 334.0805877590529, 0.0, 460.2679961517268, 169.80766383231037, 0.0, 0.0, 1.0] # pico zense
         # K = [460.585, 0.0, 334.081, 0.0, 460.268, 169.808, 0.0, 0.0, 1.0] # pico zense
-        # K = [582.62448167737955, 0.0, 313.04475870804731, 0.0, 582.69103270988637, 238.44389626620386, 0.0, 0.0, 1.0] # nyu_v2_dataset
+        K = [582.62448167737955, 0.0, 313.04475870804731, 0.0, 582.69103270988637, 238.44389626620386, 0.0, 0.0, 1.0] # nyu_v2_dataset
         # K = [582.624, 0.0, 313.045, 0.0, 582.691, 238.444, 0.0, 0.0, 1.0] # nyu_v2_dataset
         fx = K[0]
         fy = K[4]
@@ -481,12 +481,8 @@ if __name__ == '__main__':
     # constants
     iters_per_epoch = int(train_size / args.bs)
     
-    grad_factor = 10.
-    normal_factor = 1.
-    max_depth=6000.
+    max_depth=10000.
     min_depth=300.
-    min_value=10000
-    max_value=0
     nan_number = torch.tensor(np.nan).to('cuda')
     eps_number = torch.tensor(1e-7).to('cuda')
     zero_number = torch.tensor(0.).to('cuda')
@@ -624,7 +620,7 @@ if __name__ == '__main__':
                 z_fake = dfilt(img2)
                 z_fake_max=torch.max(z_fake)
                 z_fake=torch.where(valid,z_fake/z_fake_max,zero_number)
-                _,dloss=d_crit(z_fake,z)
+                dloss=d_crit(z_fake,z)
                 # depth_loss = float(img.size(0)) * rmse(z_fake, z)**2
                 eval_loss += dloss
                 # rmse_accum += float(img.size(0)) * eval_metric(z_fake, z)**2

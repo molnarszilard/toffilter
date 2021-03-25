@@ -33,7 +33,7 @@ def parse_args():
                       default=True, type=bool)
     parser.add_argument('--model_path', dest='model_path',
                       help='path to the model to use',
-                      default='saved_models/dfilt_1_9_v26.pth', type=str)
+                      default='saved_models/dfilt_1_9_v27.pth', type=str)
 
     args = parser.parse_args()
     return args
@@ -77,7 +77,7 @@ if __name__ == '__main__':
         dlist.sort()
         time_sum = 0
         counter = 0
-        max_depth=6000.
+        max_depth=10000.
         min_depth=300.
         nan_number = torch.tensor(np.nan).to('cuda')
         eps_number = torch.tensor(1e-7).to('cuda')
