@@ -27,13 +27,13 @@ def parse_args():
     parser.add_argument('--input_image_path', dest='input_image_path',
                       help='path to a single input image for evaluation',
                     #   default='/media/rambo/ssd2/Szilard/nyu_v2_filter/comparison/depth3_/', type=str)
-                      default='/media/rambo/ssd2/Szilard/pico_tofnest/4bag_unfiltered/predictions/', type=str)
+                      default='/media/rambo/ssd2/Szilard/pico_tofnest/4bag_unfiltered/depth3/', type=str)
     parser.add_argument('--eval_folder', dest='eval_folder',
                       help='evaluate only one image or the whole folder',
                       default=True, type=bool)
     parser.add_argument('--model_path', dest='model_path',
                       help='path to the model to use',
-                      default='saved_models/dfilt_1_9_v25.pth', type=str)
+                      default='saved_models/dfilt_1_9_v26.pth', type=str)
 
     args = parser.parse_args()
     return args
@@ -98,16 +98,16 @@ if __name__ == '__main__':
                 img = torch.from_numpy(depth2).float().unsqueeze(0).cuda()
                 
                 start = timeit.default_timer()
-                img2=img.clone()
-                img2[img2>max_depth] = max_depth
-                img2[img2<min_depth] = zero_number
-                imgmask=img2.clone()
+                # img2=img.clone()
+                img[img>max_depth] = max_depth
+                img[img<min_depth] = zero_number
+                imgmask=img.clone()
                 imgmask=imgmask[:,0,:,:].unsqueeze(1)
                 valid = (imgmask > 0) & (imgmask < max_depth+1)
                 # img2=img2-min_depth
-                m_depth=torch.max(img2)
-                img2=img2/max_depth                 
-                z_fake = dfilt(img2)
+                m_depth=torch.max(img)
+                img=img/max_depth                 
+                z_fake = dfilt(img)
                 z_fake = torch.where(valid, z_fake*max_depth, zero_number)
                 stop = timeit.default_timer()
                 time_sum=time_sum+stop-start
