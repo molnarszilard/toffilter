@@ -33,7 +33,7 @@ def parse_args():
                       default=True, type=bool)
     parser.add_argument('--model_path', dest='model_path',
                       help='path to the model to use',
-                      default='saved_models/dfilt_1_9_v23.pth', type=str)
+                      default='saved_models/dfilt_1_9_v25.pth', type=str)
 
     args = parser.parse_args()
     return args
@@ -108,7 +108,7 @@ if __name__ == '__main__':
                 m_depth=torch.max(img2)
                 img2=img2/max_depth                 
                 z_fake = dfilt(img2)
-                z_fake = torch.where(valid, z_fake*m_depth, zero_number)
+                z_fake = torch.where(valid, z_fake*max_depth, zero_number)
                 stop = timeit.default_timer()
                 time_sum=time_sum+stop-start
                 counter=counter+1
