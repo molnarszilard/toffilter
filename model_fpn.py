@@ -128,4 +128,9 @@ class DFILT(nn.Module):
         pred1 = self.predict1(vol)
         pred2 = F.interpolate(self.predict2(pred1), size=(H*4,W*4), mode='bilinear')
         # pred2 = self.predict2(pred1)
-        return pred2
+        #return pred2
+
+        valid = x[0][1]!=0.0
+        pred3 = pred2.clone()
+        pred3[0][0] = pred2[0][0] * valid
+        return pred3 

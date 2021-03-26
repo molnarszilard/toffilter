@@ -58,7 +58,8 @@ class NYUv2Dataset(data.Dataset):
         depthgt = cv2.imread(path.replace('depth3', 'depthgt'),cv2.IMREAD_UNCHANGED ).astype(np.float32)
         depth_input_mod = np.moveaxis(depth_input,-1,0)
         depthgt2=np.expand_dims(depthgt, axis=0)
-        return depth_input_mod, depthgt2
+        max_depth=10000.0
+        return depth_input_mod/max_depth, depthgt2/max_depth
         # return depth_input_mod, depth
 
     def __len__(self):

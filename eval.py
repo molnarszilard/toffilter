@@ -26,14 +26,14 @@ def parse_args():
                       default=1, type=int)  
     parser.add_argument('--input_image_path', dest='input_image_path',
                       help='path to a single input image for evaluation',
-                    #   default='/media/rambo/ssd2/Szilard/nyu_v2_filter/comparison/depth3_/', type=str)
-                      default='/media/rambo/ssd2/Szilard/pico_tofnest/4bag_unfiltered/depth3/', type=str)
+                      default='/media/rambo/ssd2/Szilard/nyu_v2_filter/comparison/depth3_/', type=str)
+                    #   default='/media/rambo/ssd2/Szilard/pico_tofnest/4bag_unfiltered/depth3/', type=str)
     parser.add_argument('--eval_folder', dest='eval_folder',
                       help='evaluate only one image or the whole folder',
                       default=True, type=bool)
     parser.add_argument('--model_path', dest='model_path',
                       help='path to the model to use',
-                      default='saved_models/dfilt_1_9_v28.pth', type=str)
+                      default='saved_models/dfilt_1_9_v29.pth', type=str)
 
     args = parser.parse_args()
     return args
