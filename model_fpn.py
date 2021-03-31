@@ -129,9 +129,9 @@ class DFILT(nn.Module):
         pred2 = F.interpolate(self.predict2(pred1), size=(H*4,W*4), mode='bilinear')
         # pred2 = self.predict2(pred1)
         #return pred2
-        half_number = torch.tensor(0.5).to('cuda')
-        pred3 = x[:,1,:,:]+pred2-half_number
+        # half_number = torch.tensor(0.5).to('cuda')
+        # pred3 = x[:,1,:,:]+pred2-half_number
         valid = x[0][1]!=0.0
-        pred4 = pred3.clone()
-        pred4[0][0] = pred3[0][0] * valid
-        return pred4 
+        pred4 = pred2.clone()
+        pred4[0][0] = pred2[0][0] * valid
+        return pred4

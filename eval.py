@@ -33,7 +33,7 @@ def parse_args():
                       default=True, type=bool)
     parser.add_argument('--model_path', dest='model_path',
                       help='path to the model to use',
-                      default='saved_models/dfilt_1_9_v37.pth', type=str)
+                      default='saved_models/dfilt_1_9_v38.pth', type=str)
 
     args = parser.parse_args()
     return args
