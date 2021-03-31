@@ -22,10 +22,10 @@ class NYUv2Dataset(data.Dataset):
         if train:
             self.rgb_paths = [root+'depth3/'+d for d in os.listdir(root+'depth3/')]
             # Randomly choose 50k images without replacement
-            self.rgb_paths = np.random.choice(self.rgb_paths, 11000, False)
+            self.rgb_paths = np.random.choice(self.rgb_paths, 4000, False)
         else:
             self.rgb_paths = [root+'depth3/'+d for d in os.listdir(root+'depth3/')]
-            self.rgb_paths = np.random.choice(self.rgb_paths, 2000, False)
+            self.rgb_paths = np.random.choice(self.rgb_paths, 1000, False)
         
 
         # self.augmentation = Compose([RandomHorizontalFlip()]) # , RandomCropRotate(10)
@@ -60,7 +60,7 @@ class NYUv2Dataset(data.Dataset):
         depthgt2=np.expand_dims(depthgt, axis=0)
         # max_depth=10000.0/
 
-        return depth_input_mod/np.max(depth_input_mod), depthgt2/np.max(depthgt2)
+        return depth_input_mod/np.max(depth_input_mod), depthgt2/np.max(depth_input_mod)
         # return depth_input_mod, depth
 
     def __len__(self):

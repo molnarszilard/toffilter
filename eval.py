@@ -33,7 +33,7 @@ def parse_args():
                       default=True, type=bool)
     parser.add_argument('--model_path', dest='model_path',
                       help='path to the model to use',
-                      default='saved_models/dfilt_1_9_v36.pth', type=str)
+                      default='saved_models/dfilt_1_9_v37.pth', type=str)
 
     args = parser.parse_args()
     return args
@@ -72,75 +72,76 @@ if __name__ == '__main__':
     img = Variable(torch.FloatTensor(1))
 
     print('evaluating...')
-    if args.eval_folder:
-        dlist=os.listdir(args.input_image_path)
-        dlist.sort()
-        time_sum = 0
-        counter = 0
-        max_depth=10000.
-        min_depth=300.
-        nan_number = torch.tensor(np.nan).to('cuda')
-        eps_number = torch.tensor(1e-7).to('cuda')
-        zero_number = torch.tensor(0.).to('cuda')
-        for filename in dlist:
-            if filename.endswith(".png"):
-                path=args.input_image_path+filename
-                print("Predicting for:"+filename)
-                depth = cv2.imread(path,cv2.IMREAD_UNCHANGED).astype(np.float32)
-                if len(depth.shape) < 3:
-                    print("Got 1 channel depth images, creating 3 channel depth images")
-                    combine_depth = np.empty((depth.shape[0],depth.shape[1], 3))
-                    combine_depth[:,:,0] = depth
-                    combine_depth[:,:,1] = depth
-                    combine_depth[:,:,2] = depth
-                    depth = combine_depth
-                depth2 = np.moveaxis(depth,-1,0)
-                img = torch.from_numpy(depth2).float().unsqueeze(0).cuda()
-                
-                start = timeit.default_timer()
-                # img2=img.clone()
-                # img[img>max_depth] = max_depth
-                # img[img<min_depth] = zero_number
-                # imgmask=img.clone()
-                # imgmask=imgmask[:,0,:,:].unsqueeze(1)
-                # valid = (imgmask > 0) & (imgmask < max_depth+1)
-                # img2=img2-min_depth
-                m_depth=torch.max(img)
-                # img[img<m_depth/3] = zero_number
-                img=img/m_depth                 
-                # half_number = torch.tensor(0.5).to('cuda')
-                # z_fake = img[:,1,:,:]+dfilt(img)-half_number
-                z_fake=dfilt(img)
-                # z_fake = torch.where(valid, z_fake*max_depth, zero_number)
-                stop = timeit.default_timer()
-                time_sum=time_sum+stop-start
-                counter=counter+1
-                save_path=path[:-4]
-                npimage=(z_fake[0]*m_depth).squeeze(0).cpu().detach().numpy().astype(np.uint16)
-                cv2.imwrite(save_path +'_pred.png', npimage)
+    with torch.no_grad():
+        if args.eval_folder:
+            dlist=os.listdir(args.input_image_path)
+            dlist.sort()
+            time_sum = 0
+            counter = 0
+            max_depth=10000.
+            min_depth=300.
+            nan_number = torch.tensor(np.nan).to('cuda')
+            eps_number = torch.tensor(1e-7).to('cuda')
+            zero_number = torch.tensor(0.).to('cuda')
+            for filename in dlist:
+                if filename.endswith(".png"):
+                    path=args.input_image_path+filename
+                    print("Predicting for:"+filename)
+                    depth = cv2.imread(path,cv2.IMREAD_UNCHANGED).astype(np.float32)
+                    if len(depth.shape) < 3:
+                        print("Got 1 channel depth images, creating 3 channel depth images")
+                        combine_depth = np.empty((depth.shape[0],depth.shape[1], 3))
+                        combine_depth[:,:,0] = depth
+                        combine_depth[:,:,1] = depth
+                        combine_depth[:,:,2] = depth
+                        depth = combine_depth
+                    depth2 = np.moveaxis(depth,-1,0)
+                    img = torch.from_numpy(depth2).float().unsqueeze(0).cuda()
+                    
+                    start = timeit.default_timer()
+                    # img2=img.clone()
+                    # img[img>max_depth] = max_depth
+                    # img[img<min_depth] = zero_number
+                    # imgmask=img.clone()
+                    # imgmask=imgmask[:,0,:,:].unsqueeze(1)
+                    # valid = (imgmask > 0) & (imgmask < max_depth+1)
+                    # img2=img2-min_depth
+                    m_depth=torch.max(img)
+                    # img[img<m_depth/3] = zero_number
+                    img=img/m_depth                 
+                    # half_number = torch.tensor(0.5).to('cuda')
+                    # z_fake = img[:,1,:,:]+dfilt(img)-half_number
+                    z_fake=dfilt(img)
+                    # z_fake = torch.where(valid, z_fake*max_depth, zero_number)
+                    stop = timeit.default_timer()
+                    time_sum=time_sum+stop-start
+                    counter=counter+1
+                    save_path=path[:-4]
+                    npimage=(z_fake[0]*m_depth).squeeze(0).cpu().detach().numpy().astype(np.uint16)
+                    cv2.imwrite(save_path +'_pred.png', npimage)
 
-            else:
-                continue
-        print('Predicting '+str(counter)+' images took ', time_sum/counter)  
-    else:
-        depth = cv2.imread(args.input_image_path,cv2.IMREAD_UNCHANGED).astype(np.float32)
-        if len(depth.shape) < 3:
-            print("Got 1 channel depth images, creating 3 channel depth images")
-            combine_depth = np.empty((depth.shape[0],depth.shape[1], 3))
-            combine_depth[:,:,0] = depth
-            combine_depth[:,:,1] = depth
-            combine_depth[:,:,2] = depth
-            depth = combine_depth
-        depth2 = np.moveaxis(depth,-1,0)
-        img = torch.from_numpy(depth2).float().unsqueeze(0)
-        start = timeit.default_timer()
-        z_fake = dfilt(img.cuda())
-        stop = timeit.default_timer()
-        zfv=z_fake*2-1
-        z_fake_norm=zfv.pow(2).sum(dim=1).pow(0.5).unsqueeze(1)
-        zfv=zfv/z_fake_norm
-        z_fake=(zfv+1)/2
-        save_path=args.input_image_path[:-4]
-        save_image(z_fake[0], save_path +"_pred"+'.png')
-        print('Predicting the image took ', stop-start)
+                else:
+                    continue
+            print('Predicting '+str(counter)+' images took ', time_sum/counter)  
+        else:
+            depth = cv2.imread(args.input_image_path,cv2.IMREAD_UNCHANGED).astype(np.float32)
+            if len(depth.shape) < 3:
+                print("Got 1 channel depth images, creating 3 channel depth images")
+                combine_depth = np.empty((depth.shape[0],depth.shape[1], 3))
+                combine_depth[:,:,0] = depth
+                combine_depth[:,:,1] = depth
+                combine_depth[:,:,2] = depth
+                depth = combine_depth
+            depth2 = np.moveaxis(depth,-1,0)
+            img = torch.from_numpy(depth2).float().unsqueeze(0)
+            start = timeit.default_timer()
+            z_fake = dfilt(img.cuda())
+            stop = timeit.default_timer()
+            zfv=z_fake*2-1
+            z_fake_norm=zfv.pow(2).sum(dim=1).pow(0.5).unsqueeze(1)
+            zfv=zfv/z_fake_norm
+            z_fake=(zfv+1)/2
+            save_path=args.input_image_path[:-4]
+            save_image(z_fake[0], save_path +"_pred"+'.png')
+            print('Predicting the image took ', stop-start)
     
