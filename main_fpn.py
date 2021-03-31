@@ -21,98 +21,6 @@ def adjust_learning_rate(optimizer, decay=0.1):
     for param_group in optimizer.param_groups:
         param_group['lr'] = decay * param_group['lr']
 
-class RMSE_log(nn.Module):
-    def __init__(self):
-        super(RMSE_log, self).__init__()
-    
-    def forward(self, fake, real):
-        if not fake.shape == real.shape:
-            _,_,H,W = real.shape
-            fake = F.upsample(fake, size=(H,W), mode='bilinear')
-        eps=1e-7
-        real2 = real.clone()
-        fake2 = fake.clone()
-        real2[real2==0] = eps
-        fake2[fake2==0] = eps
-        loss = torch.sqrt( torch.mean( torch.abs(torch.log(real2)-torch.log(fake2)) ** 2 ) )
-        return loss
-
-class L1(nn.Module):
-    def __init__(self):
-        super(L1, self).__init__()
-    
-    def forward(self, fake, real):
-        if not fake.shape == real.shape:
-            _,_,H,W = real.shape
-            fake = F.upsample(fake, size=(H,W), mode='bilinear')
-        loss = torch.mean( torch.abs(10.*real-10.*fake) )
-        return loss
-
-class L1_log(nn.Module):
-    def __init__(self):
-        super(L1_log, self).__init__()
-    
-    def forward(self, fake, real):
-        if not fake.shape == real.shape:
-            _,_,H,W = real.shape
-            fake = F.upsample(fake, size=(H,W), mode='bilinear')
-        loss = torch.mean( torch.abs(torch.log(real)-torch.log(fake)) )
-        return loss
-    
-class BerHu(nn.Module):
-    def __init__(self, threshold=0.2):
-        super(BerHu, self).__init__()
-        self.threshold = threshold
-    
-    def forward(real, fake):
-        mask = real>0
-        if not fake.shape == real.shape:
-            _,_,H,W = real.shape
-            fake = F.upsample(fake, size=(H,W), mode='bilinear')
-        fake = fake * mask
-        diff = torch.abs(real-fake)
-        delta = self.threshold * torch.max(diff).data.cpu().numpy()[0]
-
-        part1 = -F.threshold(-diff, -delta, 0.)
-        part2 = F.threshold(diff**2 - delta**2, 0., -delta**2.) + delta**2
-        part2 = part2 / (2.*delta)
-
-        loss = part1 + part2
-        loss = torch.sum(loss)
-        return loss
-    
-class RMSE(nn.Module):
-    def __init__(self):
-        super(RMSE, self).__init__()
-    
-    def forward(self, fake, real):
-        if not fake.shape == real.shape:
-            _,_,H,W = real.shape
-            fake = F.upsample(fake, size=(H,W), mode='bilinear')
-        loss = torch.sqrt( torch.mean( torch.abs(10.*real-10.*fake) ** 2 ))
-        return loss
-
-class GradLoss(nn.Module):
-    def __init__(self):
-        super(GradLoss, self).__init__()
-    
-    # L1 norm
-    def forward(self, grad_fake, grad_real):
-        
-        return torch.sum( torch.mean( torch.abs(grad_real-grad_fake) ) )
-
-    
-class NormalLoss(nn.Module):
-    def __init__(self):
-        super(NormalLoss, self).__init__()
-    
-    def forward(self, grad_fake, grad_real):
-        prod = ( grad_fake[:,:,None,:] @ grad_real[:,:,:,None] ).squeeze(-1).squeeze(-1)
-        fake_norm = torch.sqrt( torch.sum( grad_fake**2, dim=-1 ) )
-        real_norm = torch.sqrt( torch.sum( grad_real**2, dim=-1 ) )
-        
-        return 1 - torch.mean( prod/(fake_norm*real_norm) )
-
 class DDDDepthDiff(nn.Module):
     def __init__(self):
         super(DDDDepthDiff, self).__init__()
@@ -130,8 +38,8 @@ class DDDDepthDiff(nn.Module):
         """
         # depth is of shape (1,480,640)
         # K = [460.58518931365654, 0.0, 334.0805877590529, 0.0, 460.2679961517268, 169.80766383231037, 0.0, 0.0, 1.0] # pico zense
-        K = [460.585, 0.0, 334.081, 0.0, 460.268, 169.808, 0.0, 0.0, 1.0] # pico zense
-        # K = [582.62448167737955, 0.0, 313.04475870804731, 0.0, 582.69103270988637, 238.44389626620386, 0.0, 0.0, 1.0] # nyu_v2_dataset
+        # K = [460.585, 0.0, 334.081, 0.0, 460.268, 169.808, 0.0, 0.0, 1.0] # pico zense
+        K = [582.62448167737955, 0.0, 313.04475870804731, 0.0, 582.69103270988637, 238.44389626620386, 0.0, 0.0, 1.0] # nyu_v2_dataset
         # K = [582.624, 0.0, 313.045, 0.0, 582.691, 238.444, 0.0, 0.0, 1.0] # nyu_v2_dataset
         fx = K[0]
         fy = K[4]
@@ -464,12 +372,12 @@ if __name__ == '__main__':
     elif args.optimizer == "sgd":
         optimizer = torch.optim.SGD(params, lr=lr, momentum=0.9)
 
-    rmse = RMSE()
-    depth_criterion = RMSE_log()
-    grad_criterion = GradLoss()
-    normal_criterion = NormalLoss()
+    # rmse = RMSE()
+    # depth_criterion = RMSE_log()
+    # grad_criterion = GradLoss()
+    # normal_criterion = NormalLoss()
     d_crit=DDDDepthDiff()
-    eval_metric = RMSE_log()
+    # eval_metric = RMSE_log()
     
     # resume
     if args.resume:
@@ -546,7 +454,7 @@ if __name__ == '__main__':
             # m_depth=torch.max(img)
             # img=img/max_depth#(max_depth-min_depth)
             # z=z/max_depth#max_depth
-           
+            # half_number = torch.tensor(0.5).to('cuda')
             z_fake = dfilt(img)
             # z_fake_max=torch.max(z_fake)
             # z_fake = torch.where(valid, z_fake, zero_number)
@@ -596,7 +504,7 @@ if __name__ == '__main__':
             print('save model: {}'.format(save_name))
         print('time elapsed: %fs' % (end - start))
             
-        if epoch % 1 == 0:
+        with torch.no_grad():
             # setting to eval mode
             dfilt.eval()
 
@@ -635,13 +543,13 @@ if __name__ == '__main__':
                 # depth_loss = float(img.size(0)) * rmse(z_fake, z)**2
                 eval_loss += dloss
                 # rmse_accum += float(img.size(0)) * eval_metric(z_fake, z)**2
-                count += float(img.size(0))
-
+                # count += float(img.size(0))
+            eval_loss = eval_loss/len(eval_dataloader)
             print("[epoch %2d] loss: %.4f " \
-                            % (epoch, torch.sqrt(eval_loss/count)))
+                            % (epoch, torch.sqrt(eval_loss)))
             with open('val.txt', 'a') as f:
                 f.write("[epoch %2d] loss: %.4f\n" \
-                            % (epoch, torch.sqrt(eval_loss/count)))
+                            % (epoch, torch.sqrt(eval_loss)))
 
        
 

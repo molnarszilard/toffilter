@@ -33,7 +33,7 @@ def parse_args():
                       default=True, type=bool)
     parser.add_argument('--model_path', dest='model_path',
                       help='path to the model to use',
-                      default='saved_models/dfilt_1_9_v30.pth', type=str)
+                      default='saved_models/dfilt_1_9_v36.pth', type=str)
 
     args = parser.parse_args()
     return args
@@ -67,7 +67,7 @@ if __name__ == '__main__':
     del checkpoint
     torch.cuda.empty_cache()
 
-    dfilt.eval()
+    dfilt.train()
 
     img = Variable(torch.FloatTensor(1))
 
@@ -77,7 +77,7 @@ if __name__ == '__main__':
         dlist.sort()
         time_sum = 0
         counter = 0
-        max_depth=6000.
+        max_depth=10000.
         min_depth=300.
         nan_number = torch.tensor(np.nan).to('cuda')
         eps_number = torch.tensor(1e-7).to('cuda')
@@ -99,21 +99,24 @@ if __name__ == '__main__':
                 
                 start = timeit.default_timer()
                 # img2=img.clone()
-                img[img>max_depth] = max_depth
+                # img[img>max_depth] = max_depth
                 # img[img<min_depth] = zero_number
-                imgmask=img.clone()
-                imgmask=imgmask[:,0,:,:].unsqueeze(1)
-                valid = (imgmask > 0) & (imgmask < max_depth+1)
+                # imgmask=img.clone()
+                # imgmask=imgmask[:,0,:,:].unsqueeze(1)
+                # valid = (imgmask > 0) & (imgmask < max_depth+1)
                 # img2=img2-min_depth
-                # m_depth=torch.max(img)
-                img=img/max_depth                 
-                z_fake = dfilt(img)
-                z_fake = torch.where(valid, z_fake*max_depth, zero_number)
+                m_depth=torch.max(img)
+                # img[img<m_depth/3] = zero_number
+                img=img/m_depth                 
+                # half_number = torch.tensor(0.5).to('cuda')
+                # z_fake = img[:,1,:,:]+dfilt(img)-half_number
+                z_fake=dfilt(img)
+                # z_fake = torch.where(valid, z_fake*max_depth, zero_number)
                 stop = timeit.default_timer()
                 time_sum=time_sum+stop-start
                 counter=counter+1
                 save_path=path[:-4]
-                npimage=(z_fake[0]).squeeze(0).cpu().detach().numpy().astype(np.uint16)
+                npimage=(z_fake[0]*m_depth).squeeze(0).cpu().detach().numpy().astype(np.uint16)
                 cv2.imwrite(save_path +'_pred.png', npimage)
 
             else:
