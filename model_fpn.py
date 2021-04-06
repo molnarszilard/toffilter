@@ -123,7 +123,7 @@ class DFILT(nn.Module):
         a1,a2,a3,a4=self.agg1(p5),self.agg2(p4),self.agg3(p3),self.agg4(p2)
         d5, d4, d3, d2 = self.up1(a1), self.up2(a2), self.up3(a3), a4
         _,_,H,W = d2.size()
-        vol = torch.cat( [ F.upsample(d, size=(H*4,W*4), mode='bilinear') for d in [d5,d4,d3,d2] ], dim=1 )
+        vol = torch.cat( [ F.upsample(d, size=(H*4,W*4), mode='nearest') for d in [d5,d4,d3,d2] ], dim=1 )
         
         pred1 = self.predict1(vol)
         # pred2 = F.interpolate(self.predict2(pred1), size=(H*2,W*2), mode='bilinear')

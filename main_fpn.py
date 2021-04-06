@@ -1,20 +1,20 @@
-import numpy as np
-import os, sys
-from model_fpn import DFILT
-import argparse, time
-import torch
-from torch.autograd import Variable
 # from dataset.dataloader import DepthDataset
+from collections import Counter
 from dataset.nyuv2_dataset import NYUv2Dataset
+from model_fpn import DFILT
+from torch.autograd import Variable
+from torch.utils.data.sampler import Sampler
+from torchvision import transforms
+import argparse, time
+import matplotlib, cv2
+import matplotlib.pyplot as plt
+import numpy as np
+import open3d as o3d
+import os, sys
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision import transforms
-from torch.utils.data.sampler import Sampler
-from collections import Counter
-import matplotlib, cv2
 matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import open3d as o3d
 
 def adjust_learning_rate(optimizer, decay=0.1):
     """Sets the learning rate to the initial LR decayed by 0.5 every 20 epochs"""
@@ -401,13 +401,11 @@ if __name__ == '__main__':
     # constants
     iters_per_epoch = int(train_size / args.bs)
     
-    # max_depth=10000.
-    # min_depth=300.
-    # nan_number = torch.tensor(np.nan).to('cuda')
-    # eps_number = torch.tensor(1e-7).to('cuda')
-    # zero_number = torch.tensor(0.).to('cuda')
+    train_loss_arr = []
+    val_loss_arr = []
     for epoch in range(args.start_epoch, args.max_epochs):
-        
+        train_loss = 0 
+        eval_loss = 0
         # setting to train mode
         dfilt.train()
         start = time.time()
@@ -482,7 +480,7 @@ if __name__ == '__main__':
             loss = 1*dloss
             loss.backward()
             optimizer.step()
-
+            train_loss += loss.item()
             end = time.time()
 
             # info
@@ -516,9 +514,6 @@ if __name__ == '__main__':
 
             print('evaluating...')
 
-            eval_loss = 0
-            rmse_accum = 0
-            count = 0
             eval_data_iter = iter(eval_dataloader)
             for i, data in enumerate(eval_data_iter):
                 print(i,'/',len(eval_data_iter)-1)
@@ -544,12 +539,24 @@ if __name__ == '__main__':
                 eval_loss += dloss
                 # rmse_accum += float(img.size(0)) * eval_metric(z_fake, z)**2
                 # count += float(img.size(0))
+                
             eval_loss = eval_loss/len(eval_dataloader)
+            train_loss = train_loss/iters_per_epoch
+            train_loss_arr.append(train_loss)
+            val_loss_arr.append(eval_loss)
             print("[epoch %2d] loss: %.4f " \
                             % (epoch, torch.sqrt(eval_loss)))
             with open('val.txt', 'a') as f:
                 f.write("[epoch %2d] loss: %.4f\n" \
                             % (epoch, torch.sqrt(eval_loss)))
-
+    epochs = range(args.start_epoch, args.max_epochs)
+    plt.plot(epochs, train_loss_arr, '-g', label='Training loss')
+    plt.plot(epochs, val_loss_arr, 'b', label='Validation loss')
+    plt.title('Training and Validation loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.savefig("losses.png")
+    plt.close()
        
 
