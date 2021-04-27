@@ -42,7 +42,7 @@ class DFILT(nn.Module):
         if fixed_feature_weights:
             for p in resnet.parameters():
                 p.requires_grad = False
-        self.layer01=nn.Conv2d(3, 64, kernel_size=(7, 7), stride=(1,1), padding=(3, 3), bias=False)
+        self.layer01=nn.Conv2d(3, 64, kernel_size=(7, 7), stride=(2,2), padding=(3, 3), bias=False)
         self.layer02=nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
         self.layer03=nn.ReLU(inplace=True)
         self.layer04=nn.MaxPool2d(kernel_size=3, stride=2, padding=1, dilation=1, ceil_mode=False)
@@ -123,15 +123,17 @@ class DFILT(nn.Module):
         a1,a2,a3,a4=self.agg1(p5),self.agg2(p4),self.agg3(p3),self.agg4(p2)
         d5, d4, d3, d2 = self.up1(a1), self.up2(a2), self.up3(a3), a4
         _,_,H,W = d2.size()
-        vol = torch.cat( [ F.upsample(d, size=(H*4,W*4), mode='nearest') for d in [d5,d4,d3,d2] ], dim=1 )
+        vol = torch.cat( [ F.upsample(d, size=(H,W), mode='bilinear') for d in [d5,d4,d3,d2] ], dim=1 )
         
         pred1 = self.predict1(vol)
-        # pred2 = F.interpolate(self.predict2(pred1), size=(H*2,W*2), mode='bilinear')
-        pred2 = self.predict2(pred1)
+        pred2 = F.interpolate(self.predict2(pred1), size=(H*4,W*4), mode='bilinear')
+        # pred2 = self.predict2(pred1)
         #return pred2
         # half_number = torch.tensor(0.5).to('cuda')
         # pred3 = x[:,1,:,:]+pred2-half_number
         # valid = x[0][1]!=0.0
         # pred4 = pred2.clone()
         # pred4[0][0] = pred2[0][0] * valid
+        pred2[pred2<3*torch.max(x)/10]=0
+        pred2[pred2>=7*torch.max(x)/10]=1
         return pred2

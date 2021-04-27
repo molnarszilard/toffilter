@@ -22,10 +22,10 @@ class NYUv2Dataset(data.Dataset):
         if train:
             self.rgb_paths = [root+'depth3/train/'+d for d in os.listdir(root+'depth3/train')]
             # Randomly choose 50k images without replacement
-            # self.rgb_paths = np.random.choice(self.rgb_paths, 4000, False)
+            self.rgb_paths = np.random.choice(self.rgb_paths, 4000, False)
         else:
             self.rgb_paths = [root+'depth3/test/'+d for d in os.listdir(root+'depth3/test/')]
-            # self.rgb_paths = np.random.choice(self.rgb_paths, 1000, False)
+            self.rgb_paths = np.random.choice(self.rgb_paths, 1000, False)
         
 
         # self.augmentation = Compose([RandomHorizontalFlip()]) # , RandomCropRotate(10)

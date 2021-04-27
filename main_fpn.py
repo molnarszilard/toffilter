@@ -157,6 +157,50 @@ class DDDDepthDiff(nn.Module):
 #     return float(correct)*100 / target.size(0) 
 
 
+class PixelWiseOutlierLoss(nn.Module):
+    def __init__(self):
+        super(PixelWiseOutlierLoss, self).__init__()
+
+    def forward(self, fake, real):
+        if not fake.shape == real.shape:
+            _,_,H,W = real.shape
+            fake = F.upsample(fake, size=(H,W), mode='bilinear')
+        fake2=fake.clone()
+        real2=real.clone()
+        # fake2[fake2<torch.max(fake2)*0.1]=0
+        # real2[real2<torch.max(real2)*0.1]=0
+        # validfake = fake<torch.max(fake)*0.1
+        # validreal = real<torch.max(real)*0.1
+        # validloss = torch.logical_xor(fake2,real2)
+        # real2[real2>0] = 1
+        # fake2[fake2>0] = 1
+        validloss = fake2-real2
+        validloss[validloss<0]=0
+        pwolloss=torch.log(torch.sum(validloss))
+        return pwolloss
+
+class MaskLoss(nn.Module):
+    def __init__(self):
+        super(MaskLoss, self).__init__()
+
+    def forward(self, fake, real):
+        if not fake.shape == real.shape:
+            _,_,H,W = real.shape
+            fake = F.upsample(fake, size=(H,W), mode='bilinear')
+        fake2=fake.clone()
+        real2=real.clone()
+        eps_number = torch.tensor(1e-7).to('cuda')
+        # fake2[fake2<torch.max(fake2)*0.1]=0
+        # real2[real2<torch.max(real2)*0.1]=0
+        # validfake = fake<torch.max(fake)*0.1
+        # validreal = real<torch.max(real)*0.1
+        # validloss = torch.logical_xor(fake2,real2)
+        real2[real2>0] = 1
+        real2[real2==0] = eps_number
+        fake2[fake2==0] = eps_number
+        RMSE_log = torch.sqrt(torch.mean(torch.abs(torch.log(torch.abs(real2))-torch.log(torch.abs(fake2)))**2))
+        loss = RMSE_log*10
+        return loss
 
 def parse_args():
     """
@@ -378,6 +422,8 @@ if __name__ == '__main__':
     # normal_criterion = NormalLoss()
     d_crit=DDDDepthDiff()
     # eval_metric = RMSE_log()
+    pwol = PixelWiseOutlierLoss()
+    maskloss = MaskLoss()
     
     # resume
     if args.resume:
@@ -429,55 +475,33 @@ if __name__ == '__main__':
             img.resize_(data[0].size()).copy_(data[0])
             z.resize_(data[1].size()).copy_(data[1])
             optimizer.zero_grad()
+            # height = img.size()[2]
+            # width =img.size()[3]
+            # subimg1=img[:,:,0:height*2/3,0:width*2/3]
+            # subimg2=img[:,:,0:height*2/3,width/3:width]
+            # subimg3=img[:,:,height/3:height,0:width*2/3]
+            # subimg4=img[:,:,height/3:height,width/3:width]
 
-
-            # imgn=img.clone()
-            # print(torch.max(img))
-            # img2=img.clone()
-            # img2[img2>max_depth] = max_depth     
-            # img2[img2==0] = torch.max(img2)
-            # if torch.max(img2)>max_value:
-            #     max_value=torch.max(img2)
-            # if torch.min(img2)<min_value:
-            #     min_value=torch.min(img2) 
-            #print(torch.min(img2))
-            # img2=img.clone()
-            # img[img<min_depth] = zero_number
-            # img[img>max_depth] = max_depth
-            # imgmask=img.clone()       
-            # imgmask=imgmask[:,0,:,:].unsqueeze(1)     
-            # valid = (imgmask > 0) & (imgmask < max_depth+1)
-            
-            # img3=img3-min_depth
-            # m_depth=torch.max(img)
-            # img=img/max_depth#(max_depth-min_depth)
-            # z=z/max_depth#max_depth
-            # half_number = torch.tensor(0.5).to('cuda')
             z_fake = dfilt(img)
-            # z_fake_max=torch.max(z_fake)
-            # z_fake = torch.where(valid, z_fake, zero_number)
-            
-            # print(torch.max(z_fake))
-            # z_fake=z_fake/torch.max(z_fake)
-            
-            # z_fake=z_fake*10000.
-            # depth_loss = depth_criterion(z_fake, z)
-            # point_loss=point_criterion(z_fake,z)
+            # zf1=dfilt(subimg1)
+            # zf2=dfilt(subimg2)
+            # zf3=dfilt(subimg3)
+            # zf4=dfilt(subimg4)
+            # zf=img.clone()
+            # zf[:,:,0:height/3,0:width/3]=zf1[:,:,0:height/3,0:width/3]
+            # zf[:,:,0:height/3,width*2/3:width]=zf2[:,:,0:height/3,width/3:width*2/3]
+            # zf[:,:,height*2/3:height,0:width/3]=zf3[:,:,height/3:height*2/3,0:width/3]
+            # zf[:,:,height*2/3:height,width*2/3:width]=zf4[:,:,height/3:height*2/3,width/3:width*2/3]
+            # zf[:,:,he]
 
-            # o3d_pcd = o3d.geometry.PointCloud()
-            # input_depth = z_fake.clone() 
-            # input_pcd = d_crit.point_cloud(input_depth[0]).cpu().detach().numpy()
-            # o3d_pcd.points = o3d.utility.Vector3dVector(input_pcd*max_depth)
-            # o3d.io.write_point_cloud(args.output_dir+"/input_cloud"+str(epoch)+".pcd", o3d_pcd)
-            dloss=d_crit(z_fake,z)
-            # print(dloss)
-            # grad_real, grad_fake = imgrad_yx(z), imgrad_yx(z_fake)
-            # grad_loss = grad_criterion(grad_fake, grad_real)     * grad_factor * (epoch>3)
-            # normal_loss = normal_criterion(grad_fake, grad_real) * normal_factor * (epoch>7)
+            # dloss=d_crit(z_fake,z)
+            # loss = 1*dloss
+
+            # pwloss = pwol(z_fake,z)
+            # loss = pwloss
+
+            loss=maskloss(z_fake,z)
             
-            # loss = depth_loss + grad_loss + normal_loss
-            # loss = point_loss
-            loss = 1*dloss
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
@@ -520,25 +544,14 @@ if __name__ == '__main__':
 
                 img.resize_(data[0].size()).copy_(data[0])
                 z.resize_(data[1].size()).copy_(data[1])
-                # img=img.clone()
-                # img[img<min_depth] = zero_number
-                # img[img>max_depth] = max_depth
-                # imgmask=img2.clone()            
-                # valid = (imgmask > 0) & (imgmask < max_depth+1)
                 
-                # img3=img3-min_depth
-                # m_depth=torch.max(img2)
-                # img=img/max_depth#(max_depth-min_depth)
-                # z=z/torch.max(z)#max_depth
-                # valid=valid[:,0,:,:].unsqueeze(1)
                 z_fake = dfilt(img)
-                # z_fake_max=torch.max(z_fake)
-                # z_fake=torch.where(valid,z_fake/z_fake_max,zero_number)
-                dloss=d_crit(z_fake,z)
-                # depth_loss = float(img.size(0)) * rmse(z_fake, z)**2
-                eval_loss += dloss
-                # rmse_accum += float(img.size(0)) * eval_metric(z_fake, z)**2
-                # count += float(img.size(0))
+                
+                # dloss=d_crit(z_fake,z)
+                # pwloss = pwol(z_fake,z)
+                mloss = maskloss(z_fake,z)
+                eval_loss += mloss
+                
                 
             eval_loss = eval_loss/len(eval_dataloader)
             train_loss = train_loss/iters_per_epoch
