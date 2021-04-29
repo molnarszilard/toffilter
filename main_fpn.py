@@ -2,6 +2,7 @@
 from collections import Counter
 from dataset.nyuv2_dataset import NYUv2Dataset
 from model_fpn import DFILT
+from model_unet import DFILTUNET
 from torch.autograd import Variable
 from torch.utils.data.sampler import Sampler
 from torchvision import transforms
@@ -386,9 +387,11 @@ if __name__ == '__main__':
         
     # network initialization
     print('Initializing model...')
-    dfilt = DFILT(fixed_feature_weights=False)
+    # dfilt = DFILT(fixed_feature_weights=False)
+    dfilt = DFILTUNET(fixed_feature_weights=False)
     if args.cuda:
         dfilt = dfilt.cuda()
+    
         
     print('Done!')
 
@@ -494,13 +497,13 @@ if __name__ == '__main__':
             # zf[:,:,height*2/3:height,width*2/3:width]=zf4[:,:,height/3:height*2/3,width/3:width*2/3]
             # zf[:,:,he]
 
-            # dloss=d_crit(z_fake,z)
-            # loss = 1*dloss
+            dloss=d_crit(z_fake,z)
+            loss = 1*dloss
 
             # pwloss = pwol(z_fake,z)
             # loss = pwloss
 
-            loss=maskloss(z_fake,z)
+            # loss=maskloss(z_fake,z)
             
             loss.backward()
             optimizer.step()

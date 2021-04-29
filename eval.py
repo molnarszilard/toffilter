@@ -1,4 +1,5 @@
 from model_fpn import DFILT
+from model_unet import DFILTUNET
 from threading import Thread
 from torch.autograd import Variable
 from torchvision.utils import save_image
@@ -33,7 +34,7 @@ def parse_args():
                       default=True, type=bool)
     parser.add_argument('--model_path', dest='model_path',
                       help='path to the model to use',
-                      default='saved_models/dfilt_1_9_v42.pth', type=str)
+                      default='saved_models/dfilt_1_9_v43.pth', type=str)
 
     args = parser.parse_args()
     return args
@@ -47,7 +48,8 @@ if __name__ == '__main__':
     
     # network initialization
     print('Initializing model...')
-    dfilt = DFILT(fixed_feature_weights=False)
+    # dfilt = DFILT(fixed_feature_weights=False)
+    dfilt = DFILTUNET(fixed_feature_weights=False)
     if args.cuda:
         dfilt = dfilt.cuda()
         
