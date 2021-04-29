@@ -4,136 +4,122 @@ import torch.nn.functional as F
 
 from torch.autograd import Variable
 from torchvision.models.resnet import resnet101
-
-def agg_node(in_planes, out_planes):
-    return nn.Sequential(
-        nn.Conv2d(in_planes, in_planes, kernel_size=3, stride=1, padding=1),
-        nn.ReLU(),
-        nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=1, padding=1),
-        nn.ReLU(),
-    )
-
-def smooth(in_planes, out_planes):
-    return nn.Sequential(
-        nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=1, padding=1),
-        nn.ReLU(),
-    )
-
-def predict(in_planes, out_planes):
-    return nn.Sequential(
-        nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=1, padding=1),
-        nn.Sigmoid(),
-    )
-
-def upshuffle(in_planes, out_planes, upscale_factor):
-    return nn.Sequential(
-        nn.Conv2d(in_planes, out_planes*upscale_factor**2, kernel_size=3, stride=1, padding=1),
-        nn.PixelShuffle(upscale_factor),
-        nn.ReLU()
-    )
-
 class DFILTUNET(nn.Module):
     def __init__(self, pretrained=True, fixed_feature_weights=False):
         super(DFILTUNET, self).__init__()
 
-        # resnet = resnet101(pretrained=pretrained)
-
-        # # Freeze those weights
-        # if fixed_feature_weights:
-        #     for p in resnet.parameters():
-        #         p.requires_grad = False
-        # self.layer01=nn.Conv2d(3, 64, kernel_size=(7, 7), stride=(2,2), padding=(3, 3), bias=False)
-        # self.layer02=nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-        # self.layer03=nn.ReLU(inplace=True)
-        # self.layer04=nn.MaxPool2d(kernel_size=3, stride=2, padding=1, dilation=1, ceil_mode=False)
-        # # self.layer0=nn.Sequential(self.layer01,self.layer02,self.layer03,self.layer04)
-        # self.layer0 = nn.Sequential(resnet.conv1, resnet.bn1, resnet.relu, resnet.maxpool)        
-        # self.layer1 = nn.Sequential(resnet.layer1)
-        # self.layer2 = nn.Sequential(resnet.layer2)
-        # self.layer3 = nn.Sequential(resnet.layer3)
-        # self.layer4 = nn.Sequential(resnet.layer4)
-
-        # # Top layer
-        # self.toplayer = nn.Conv2d(2048, 256, kernel_size=1, stride=1, padding=0)  # Reduce channels
-
-        # # Lateral layers
-        # self.latlayer1 = nn.Conv2d(1024, 256, kernel_size=1, stride=1, padding=0)
-        # self.latlayer2 = nn.Conv2d( 512, 256, kernel_size=1, stride=1, padding=0)
-        # self.latlayer3 = nn.Conv2d( 256, 256, kernel_size=1, stride=1, padding=0)
-
-        # # Smooth layers
-        # self.smooth1 = nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1)
-        # self.smooth2 = nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1)
-        # self.smooth3 = nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1)
-
-        # # Aggregate layers
-        # self.agg1 = agg_node(256, 128)
-        # self.agg2 = agg_node(256, 128)
-        # self.agg3 = agg_node(256, 128)
-        # self.agg4 = agg_node(256, 128)
         
-        # # Upshuffle layers
-        # self.up1 = upshuffle(128,128,8)
-        # self.up2 = upshuffle(128,128,4)
-        # self.up3 = upshuffle(128,128,2)
-        
-        # # Depth prediction
-        # self.predict1 = smooth(512, 128)
-        # self.predict2 = predict(128, 1)
-
         ngf = 16
-
-        self.cnv1_an = nn.Conv2d(1, ngf, [7, 7], stride=2)
-
-        self.cnv1_d = nn.Conv2d(1, ngf // 2, [7, 7], stride=2)
+        self.layer01=nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2,2), padding=(3, 3), bias=False)
+        self.layer02=nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        self.layer03=nn.ReLU(inplace=True)
+        self.layer04=nn.MaxPool2d(kernel_size=3, stride=2, padding=1, dilation=1, ceil_mode=False)
+        self.layer0=nn.Sequential(self.layer01,self.layer02,self.layer03,self.layer04)
+        
+        # self.cnv1_d_an = nn.Conv2d(1, ngf, [7, 7], stride=2)
+        self.cnv1_d = nn.Conv2d(1, ngf // 2, [7, 7], stride=2, padding=(3, 3), bias=False)
         self.cnv1_c = nn.Conv2d(1, ngf // 2, [1, 1], stride=1)
         # self.cnv1_a = torch.cat([cnv1_d, cnv1_c], dim=1)
-
-        self.cnv2 = nn.Conv2d(ngf, ngf * 2, [5,5], stride=2)
-        self.cnv3 = nn.Conv2d(ngf * 2, ngf * 4, [3, 3], stride=2)
-        self.cnv4 = nn.Conv2d(ngf * 4, ngf * 8, [3, 3], stride=2)
-        self.cnv5 = nn.Conv2d(ngf * 8, ngf * 8, [3, 3], stride=2)
-        self.cnv6 = nn.Conv2d(ngf * 8, ngf * 8, [3, 3], stride=2)
-        self.cnv7 = nn.Conv2d(ngf * 8, ngf * 8, [3, 3], stride=2)  # /128
+        self.cnv1_an = nn.Sequential(nn.Conv2d(1, ngf, [7, 7], stride=2, padding=(3, 3), bias=False),
+                        nn.BatchNorm2d(ngf, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+                        nn.ReLU(inplace=True),
+                        nn.MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False))
+        self.cnv2 = nn.Sequential(nn.Conv2d(ngf, ngf * 2, [5,5], stride=2, padding=2, bias=False),
+                        nn.BatchNorm2d(ngf*2, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+                        nn.ReLU(inplace=True),
+                        nn.MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False))
+        self.cnv3 = nn.Sequential(nn.Conv2d(ngf * 2, ngf * 4, [3, 3], stride=2, padding=1, bias=False),
+                        nn.BatchNorm2d(ngf*4, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+                        nn.ReLU(inplace=True),
+                        nn.MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False))
+        self.cnv4 = nn.Sequential(nn.Conv2d(ngf * 4, ngf * 8, [3, 3], stride=2, padding=1, bias=False),
+                        nn.BatchNorm2d(ngf*8, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+                        nn.ReLU(inplace=True),
+                        nn.MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False))
+        self.cnv5 = nn.Sequential(nn.Conv2d(ngf * 8, ngf * 8, [3, 3], stride=2, padding=1, bias=False),
+                        nn.BatchNorm2d(ngf*8, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+                        nn.ReLU(inplace=True),
+                        nn.MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False))
+        self.cnv6 = nn.Sequential(nn.Conv2d(ngf * 8, ngf * 8, [3, 3], stride=2, padding=1, bias=False),
+                        nn.BatchNorm2d(ngf*8, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+                        nn.ReLU(inplace=True),
+                        nn.MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)) 
+        self.cnv7 = nn.Sequential(nn.Conv2d(ngf * 8, ngf * 8, [3, 3], stride=2, padding=1, bias=False),
+                        nn.BatchNorm2d(ngf*8, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+                        nn.ReLU(inplace=True),
+                        nn.MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False))  # /128
 
         self.upcnv7 = nn.ConvTranspose2d(ngf * 8, ngf * 8, [3, 3], stride=2)  # /64
         # self.upcnv7.resize_(cnv6.size())
         # self.i7_in = torch.cat([upcnv7, cnv6], dim=1)
-        self.icnv7 = nn.Conv2d(ngf * 16, ngf * 8, [3, 3], stride=1)
+        self.icnv7 = nn.Sequential(nn.Conv2d(ngf * 16, ngf * 8, [3, 3], stride=1, padding=1, bias=False),
+                        nn.BatchNorm2d(ngf*8, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+                        nn.ReLU(inplace=True),
+                        nn.MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False))
 
         self.upcnv6 = nn.ConvTranspose2d(ngf * 8, ngf * 8, [3, 3], stride=2)  # /32
         # self.upcnv6.resize_(cnv5.size())
         # self.i6_in = torch.cat([upcnv6, cnv5], dim=1)
-        self.icnv6 = nn.Conv2d(ngf * 16, ngf * 8, [3, 3], stride=1)
+        self.icnv6 = nn.Sequential(nn.Conv2d(ngf * 16, ngf * 8, [3, 3], stride=1, padding=1, bias=False),
+                        nn.BatchNorm2d(ngf*8, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+                        nn.ReLU(inplace=True),
+                        nn.MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False))
 
         self.upcnv5 = nn.ConvTranspose2d(ngf * 8, ngf * 8, [3, 3], stride=2)  # /16
         # self.upcnv5.resize_(cnv4.size())
         # self.i5_in = torch.cat([upcnv5, cnv4], dim=1)
-        self.icnv5 = nn.Conv2d(ngf * 16, ngf * 8, [3, 3], stride=1)
+        self.icnv5 = nn.Sequential(nn.Conv2d(ngf * 16, ngf * 8, [3, 3], stride=1, padding=1, bias=False),
+                        nn.BatchNorm2d(ngf*8, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+                        nn.ReLU(inplace=True),
+                        nn.MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False))
 
         self.upcnv4 = nn.ConvTranspose2d(ngf * 8, ngf * 4, [3, 3], stride=2)  # /8
         # self.i4_in = torch.cat([upcnv4, cnv3], dim=1)
-        self.icnv4 = nn.Conv2d(ngf * 8, ngf * 4, [3, 3], stride=1)
-        self.out4 = nn.Conv2d(ngf * 4, 1, [3, 3], stride=1)
+        self.icnv4 = nn.Sequential(nn.Conv2d(ngf * 8, ngf * 4, [3, 3], stride=1, padding=1, bias=False),
+                        nn.BatchNorm2d(ngf*4, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+                        nn.ReLU(inplace=True),
+                        nn.MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False))
+        self.out4 = nn.Sequential(nn.Conv2d(ngf * 4, 1, [3, 3], stride=1, padding=1, bias=False),
+                        nn.BatchNorm2d(1, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+                        nn.ReLU(inplace=True),
+                        nn.MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False))
         # self.out4_up = F.interpolate(out4, size=(H/4,W/4), mode='bilinear')
         # out4_up = tf.image.resize_bilinear(out4, [int(H / 4), int(W / 4)])
 
         self.upcnv3 = nn.ConvTranspose2d(ngf * 4, ngf * 2, [3, 3], stride=2)  # /4
         # self.i3_in = torch.cat([upcnv3, cnv2, out4_up], dim=1)
-        self.icnv3 = nn.Conv2d(ngf * 4+1, ngf * 2, [3, 3], stride=1)
-        self.out3 = nn.Conv2d(ngf * 2, 1, [3, 3], stride=1)
+        self.icnv3 = nn.Sequential(nn.Conv2d(ngf * 4+1, ngf * 2, [3, 3], stride=1, padding=1, bias=False),
+                        nn.BatchNorm2d(ngf*2, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+                        nn.ReLU(inplace=True),
+                        nn.MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False))
+        self.out3 = nn.Sequential(nn.Conv2d(ngf * 2, 1, [3, 3], stride=1, padding=1, bias=False),
+                        nn.BatchNorm2d(1, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+                        nn.ReLU(inplace=True),
+                        nn.MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False))
         # self.out3_up = F.interpolate(out4, size=(H/2,W/2), mode='bilinear')
 
         self.upcnv2 = nn.ConvTranspose2d(ngf * 2, ngf, [3, 3], stride=2)  # /2
         # self.i2_in = torch.cat([upcnv2, cnv1, out3_up], dim=1)
-        self.icnv2 = nn.Conv2d(ngf * 2+1, ngf, [3, 3], stride=1)
-        self.out2 = nn.Conv2d(ngf, 1, [3, 3], stride=1)
+        self.icnv2 = nn.Sequential(nn.Conv2d(ngf * 2+1, ngf, [3, 3], stride=1, padding=1, bias=False),
+                        nn.BatchNorm2d(ngf, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+                        nn.ReLU(inplace=True),
+                        nn.MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False))
+        self.out2 = nn.Sequential(nn.Conv2d(ngf, 1, [3, 3], stride=1, padding=1, bias=False),
+                        nn.BatchNorm2d(1, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+                        nn.ReLU(inplace=True),
+                        nn.MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False))
         # out2_up = F.interpolate(out4, size=(H,W), mode='bilinear')
 
         self.upcnv1 = nn.ConvTranspose2d(ngf, ngf // 2, [3, 3], stride=2)
         # self.i1_in = torch.cat([upcnv1], dim=1)  # [upcnv1, out2_up]
-        self.icnv1 = nn.Conv2d(ngf//2, ngf, [3, 3], stride=1)
-        self.out1 = nn.Conv2d(ngf, 1, [3, 3], stride=1)
+        self.icnv1 = nn.Sequential(nn.Conv2d(ngf//2, ngf, [3, 3], stride=1, padding=1, bias=False),
+                        nn.BatchNorm2d(ngf, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+                        nn.ReLU(inplace=True),
+                        nn.MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False))
+        self.out1 = nn.Sequential(nn.Conv2d(ngf, 1, [3, 3], stride=1, padding=1, bias=False),
+                        nn.BatchNorm2d(1, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+                        nn.ReLU(inplace=True),
+                        nn.MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False))
         
     def _upsample_add(self, x, y):
         '''Upsample and add two feature maps.
@@ -204,19 +190,16 @@ class DFILTUNET(nn.Module):
             conv1_d = self.cnv1_d(depth_in)
             conv1_c = self.cnv1_c(other_in) # here should be color image or other channel of x
             conv1 = torch.cat([conv1_d, conv1_c], dim=1)
-        conv1 = F.interpolate(conv1, size=(H//2,W//2), mode='bilinear')
+        # conv1 = self.bn1(conv1)
+        # conv1 = self.relu(conv1)
+        # conv1 = self.mp(conv1)
+        conv = self.layer0(depth_in)
         conv2 = self.cnv2(conv1)
-        conv2 = F.interpolate(conv2, size=(H//4,W//4), mode='bilinear')
         conv3 = self.cnv3(conv2)
-        conv3 = F.interpolate(conv3, size=(H//8,W//8), mode='bilinear')
         conv4 = self.cnv4(conv3)
-        conv4 = F.interpolate(conv4, size=(H//16,W//16), mode='bilinear')
         conv5 = self.cnv5(conv4)
-        conv5 = F.interpolate(conv5, size=(H//32,W//32), mode='bilinear')
         conv6 = self.cnv6(conv5)
-        conv6 = F.interpolate(conv6, size=(H//64,W//64), mode='bilinear')
         conv7 = self.cnv7(conv6) # /128
-        conv7 = F.interpolate(conv7, size=(H//128,W//128), mode='bilinear')
 
         upconv7 = self.upcnv7(conv7)  # /64
         # upconv7.reshape(conv6.shape)
@@ -269,6 +252,9 @@ class DFILTUNET(nn.Module):
         out = F.interpolate(out, size=(depth_in.shape[2],depth_in.shape[3]), mode='bilinear')
         # end_pts = nn.utils.convert_collection_to_dict(end_pts_collection)
         # weight_vars = tf.get_collection(weight_collection)
-        # valid = depth_in[0][0]!=0.0
-        # out[0][0] = out[0][0] * valid
+        valid = depth_in[0][0]!=0.0
+        out[0][0] = out[0][0] * valid
+        # print(out.max(),out.min())
+        out=out/out.max()
+        # print(out.max(),out.min())
         return out#, end_pts, weight_vars
