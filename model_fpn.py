@@ -134,6 +134,6 @@ class DFILT(nn.Module):
         # valid = x[0][1]!=0.0
         # pred4 = pred2.clone()
         # pred4[0][0] = pred2[0][0] * valid
-        pred2[pred2<3*torch.max(x)/10]=0
-        pred2[pred2>=7*torch.max(x)/10]=1
+        # pred2[pred2<3*torch.max(x)/10]=0
+        # pred2[pred2>=7*torch.max(x)/10]=1
         return pred2

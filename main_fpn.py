@@ -3,9 +3,13 @@ from collections import Counter
 from dataset.nyuv2_dataset import NYUv2Dataset
 from model_fpn import DFILT
 from model_unet import DFILTUNET
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import log_loss
 from torch.autograd import Variable
 from torch.utils.data.sampler import Sampler
 from torchvision import transforms
+from unet_model import UNet
+from autoencode import Autoencoder
 import argparse, time
 import matplotlib, cv2
 import matplotlib.pyplot as plt
@@ -388,7 +392,9 @@ if __name__ == '__main__':
     # network initialization
     print('Initializing model...')
     # dfilt = DFILT(fixed_feature_weights=False)
-    dfilt = DFILTUNET(fixed_feature_weights=False)
+    # dfilt = DFILTUNET(fixed_feature_weights=False)
+    dfilt = UNet(3,1)
+    dfilt = Autoencoder()
     if args.cuda:
         dfilt = dfilt.cuda()
     
@@ -427,6 +433,7 @@ if __name__ == '__main__':
     # eval_metric = RMSE_log()
     pwol = PixelWiseOutlierLoss()
     maskloss = MaskLoss()
+    criterion = nn.MSELoss()
     
     # resume
     if args.resume:
@@ -499,6 +506,7 @@ if __name__ == '__main__':
 
             dloss=d_crit(z_fake,z)
             loss = 1*dloss
+            # loss = criterion(z_fake, z)
 
             # pwloss = pwol(z_fake,z)
             # loss = pwloss
@@ -550,10 +558,11 @@ if __name__ == '__main__':
                 
                 z_fake = dfilt(img)
                 
-                # dloss=d_crit(z_fake,z)
-                # pwloss = pwol(z_fake,z)
-                mloss = maskloss(z_fake,z)
-                eval_loss += mloss
+                eloss=d_crit(z_fake,z)
+                # eloss = pwol(z_fake,z)
+                # eloss = maskloss(z_fake,z)
+                # eloss = criterion(z_fake, z)
+                eval_loss += eloss
                 
                 
             eval_loss = eval_loss/len(eval_dataloader)
