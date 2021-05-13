@@ -109,7 +109,7 @@ if __name__ == '__main__':
                     time_sum=time_sum+stop-start
                     counter=counter+1
                     save_path=path[:-4]
-                    npimage=(z_fake[0]*m_depth).squeeze(0).cpu().detach().numpy().astype(np.uint16)
+                    npimage=(z_fake[0]*255).squeeze(0).cpu().detach().numpy().astype(np.uint8)
                     cv2.imwrite(save_path +'_pred.png', npimage)
 
                 else:
