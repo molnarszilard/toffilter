@@ -207,6 +207,24 @@ class MaskLoss(nn.Module):
         loss = RMSE_log*10
         return loss
 
+class CEntropyLoss(nn.Module):
+    def __init__(self):
+        super(CEntropyLoss, self).__init__()
+
+    def forward(self, fake, real):
+        if not fake.shape == real.shape:
+            _,_,H,W = real.shape
+            fake = F.upsample(fake, size=(H,W), mode='bilinear')
+        fake2=fake.clone()
+        real2=real.clone()
+        eps_number = torch.tensor(1e-7).to('cuda')
+        real2[real2>0] = 1
+        # real2[real2==0] = eps_number
+        fake2[fake2==0] = eps_number
+        celoss=-torch.sum(real2*torch.log(fake2)+(1-real2)*torch.log(1-fake2))
+        
+        return celoss
+
 def parse_args():
     """
     Parse input arguments
@@ -393,7 +411,7 @@ if __name__ == '__main__':
     print('Initializing model...')
     # dfilt = DFILT(fixed_feature_weights=False)
     # dfilt = DFILTUNET(fixed_feature_weights=False)
-    dfilt = UNet(3,1)
+    # dfilt = UNet(3,1)
     dfilt = Autoencoder()
     if args.cuda:
         dfilt = dfilt.cuda()
@@ -434,6 +452,7 @@ if __name__ == '__main__':
     pwol = PixelWiseOutlierLoss()
     maskloss = MaskLoss()
     criterion = nn.MSELoss()
+    celoss = CEntropyLoss()
     
     # resume
     if args.resume:
@@ -504,14 +523,15 @@ if __name__ == '__main__':
             # zf[:,:,height*2/3:height,width*2/3:width]=zf4[:,:,height/3:height*2/3,width/3:width*2/3]
             # zf[:,:,he]
 
-            dloss=d_crit(z_fake,z)
-            loss = 1*dloss
+            # dloss=d_crit(z_fake,z)
+            # loss = 1*dloss
             # loss = criterion(z_fake, z)
 
             # pwloss = pwol(z_fake,z)
             # loss = pwloss
 
             # loss=maskloss(z_fake,z)
+            loss = celoss(z_fake,z)
             
             loss.backward()
             optimizer.step()
@@ -558,10 +578,11 @@ if __name__ == '__main__':
                 
                 z_fake = dfilt(img)
                 
-                eloss=d_crit(z_fake,z)
+                # eloss=d_crit(z_fake,z)
                 # eloss = pwol(z_fake,z)
                 # eloss = maskloss(z_fake,z)
                 # eloss = criterion(z_fake, z)
+                eloss = celoss(z_fake,z)
                 eval_loss += eloss
                 
                 
