@@ -35,7 +35,7 @@ def parse_args():
                       default=True, type=bool)
     parser.add_argument('--model_path', dest='model_path',
                       help='path to the model to use',
-                      default='saved_models/dfilt_1_9_v48.pth', type=str)
+                      default='saved_models/dfilt_1_9_v50.pth', type=str)
 
     args = parser.parse_args()
     return args
@@ -109,7 +109,8 @@ if __name__ == '__main__':
                     time_sum=time_sum+stop-start
                     counter=counter+1
                     save_path=path[:-4]
-                    npimage=(z_fake[0]*255).squeeze(0).cpu().detach().numpy().astype(np.uint8)
+                    # npimage=(z_fake[0]*255).squeeze(0).cpu().detach().numpy().astype(np.uint8)
+                    npimage=(z_fake[0]*1000).squeeze(0).cpu().detach().numpy().astype(np.uint16)
                     cv2.imwrite(save_path +'_pred.png', npimage)
 
                 else:

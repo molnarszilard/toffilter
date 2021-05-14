@@ -220,7 +220,7 @@ class CEntropyLoss(nn.Module):
         eps_number = torch.tensor(1e-7).to('cuda')
         real2[real2>0] = 1
         # real2[real2==0] = eps_number
-        fake2[fake2==0] = eps_number
+        # fake2[fake2==0] = eps_number
         celoss=-torch.sum(real2*torch.log(fake2)+(1-real2)*torch.log(1-fake2))
         
         return celoss
