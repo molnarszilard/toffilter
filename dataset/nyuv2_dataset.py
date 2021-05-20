@@ -13,19 +13,19 @@ import cv2
 
     
 class NYUv2Dataset(data.Dataset):
-    def __init__(self, root='/media/rambo/ssd2/Szilard/nyu_v2_filter/dataset/', seed=None, train=True):
+    def __init__(self, root='/media/rambo/ssd2/Szilard/nyu_v2_filter/dataset_plane/', seed=None, train=True):
     # def __init__(self, root='/media/rambo/ssd2/Szilard/pico_tofnest/1bag_augmented/dataset_filter/', seed=None, train=True):
         
         np.random.seed(seed)
         self.root = Path(root)
         self.train = train
         if train:
-            self.rgb_paths = [root+'depth3/train/'+d for d in os.listdir(root+'depth3/train')]
+            self.rgb_paths = [root+'depth3/'+d for d in os.listdir(root+'depth3/')]
             # Randomly choose 50k images without replacement
-            self.rgb_paths = np.random.choice(self.rgb_paths, 4000, False)
+            self.rgb_paths = np.random.choice(self.rgb_paths, 500, False)
         else:
-            self.rgb_paths = [root+'depth3/test/'+d for d in os.listdir(root+'depth3/test/')]
-            self.rgb_paths = np.random.choice(self.rgb_paths, 1000, False)
+            self.rgb_paths = [root+'depth3/'+d for d in os.listdir(root+'depth3/')]
+            self.rgb_paths = np.random.choice(self.rgb_paths, 100, False)
         
 
         # self.augmentation = Compose([RandomHorizontalFlip()]) # , RandomCropRotate(10)

@@ -9,7 +9,7 @@ from torch.autograd import Variable
 from torch.utils.data.sampler import Sampler
 from torchvision import transforms
 from unet_model import UNet
-from autoencode import Autoencoder
+from autoencoder import Autoencoder
 import argparse, time
 import matplotlib, cv2
 import matplotlib.pyplot as plt
@@ -221,7 +221,7 @@ class CEntropyLoss(nn.Module):
         real2[real2>0] = 1
         # real2[real2==0] = eps_number
         # fake2[fake2==0] = eps_number
-        celoss=-torch.sum(real2*torch.log(fake2)+(1-real2)*torch.log(1-fake2))
+        celoss=-torch.mean(real2*torch.log(fake2)+(1-real2)*torch.log(1-fake2))
         
         return celoss
 
@@ -453,6 +453,10 @@ if __name__ == '__main__':
     maskloss = MaskLoss()
     criterion = nn.MSELoss()
     celoss = CEntropyLoss()
+
+    pos_weight = torch.ones([1]).cuda()
+    # criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+    criterion = nn.BCELoss()
     
     # resume
     if args.resume:
@@ -511,7 +515,7 @@ if __name__ == '__main__':
             # subimg3=img[:,:,height/3:height,0:width*2/3]
             # subimg4=img[:,:,height/3:height,width/3:width]
 
-            z_fake = dfilt(img)
+            z_fake = dfilt(z)
             # zf1=dfilt(subimg1)
             # zf2=dfilt(subimg2)
             # zf3=dfilt(subimg3)
@@ -523,15 +527,17 @@ if __name__ == '__main__':
             # zf[:,:,height*2/3:height,width*2/3:width]=zf4[:,:,height/3:height*2/3,width/3:width*2/3]
             # zf[:,:,he]
 
-            # dloss=d_crit(z_fake,z)
-            # loss = 1*dloss
+            dloss=d_crit(z_fake,z)
+            loss = 1*dloss
             # loss = criterion(z_fake, z)
 
             # pwloss = pwol(z_fake,z)
             # loss = pwloss
 
             # loss=maskloss(z_fake,z)
-            loss = celoss(z_fake,z)
+            # z[z>0] = 1
+            # loss = criterion(z_fake, z)
+            # loss = celoss(z_fake,z)
             
             loss.backward()
             optimizer.step()
@@ -576,13 +582,15 @@ if __name__ == '__main__':
                 img.resize_(data[0].size()).copy_(data[0])
                 z.resize_(data[1].size()).copy_(data[1])
                 
-                z_fake = dfilt(img)
+                z_fake = dfilt(z)
                 
-                # eloss=d_crit(z_fake,z)
+                eloss=d_crit(z_fake,z)
                 # eloss = pwol(z_fake,z)
                 # eloss = maskloss(z_fake,z)
                 # eloss = criterion(z_fake, z)
-                eloss = celoss(z_fake,z)
+                # eloss = celoss(z_fake,z)
+                # z[z>0] = 1
+                # eloss = criterion(z_fake, z)
                 eval_loss += eloss
                 
                 
