@@ -20,7 +20,7 @@ class NYUv2Dataset(data.Dataset):
         self.root = Path(root)
         self.train = train
         if train:
-            self.rgb_paths = [root+'depth3/'+d for d in os.listdir(root+'depth3/')]
+            self.rgb_paths = [root+'depthgt/'+d for d in os.listdir(root+'depthgt/')]
             # Randomly choose 50k images without replacement
             self.rgb_paths = np.random.choice(self.rgb_paths, 500, False)
         else:
@@ -47,9 +47,12 @@ class NYUv2Dataset(data.Dataset):
         # rgb, depth = np.array(rgb), np.array(depth)
         # return self.rgb_transform(rgb), self.depth_transform(depth).squeeze(-1)
 
+        if cv2.imread(path,cv2.IMREAD_UNCHANGED) is None:
+            print(path)
+
         depth_input = cv2.imread(path,cv2.IMREAD_UNCHANGED).astype(np.float32)
         if len(depth_input.shape) < 3:
-            print("Got 1 channel depth images, creating 3 channel depth images")
+            # print("Got 1 channel depth images, creating 3 channel depth images")
             combine_depth = np.empty((depth_input.shape[0],depth_input.shape[1], 3))
             combine_depth[:,:,0] = depth_input
             combine_depth[:,:,1] = depth_input
@@ -59,7 +62,7 @@ class NYUv2Dataset(data.Dataset):
         depth_input_mod = np.moveaxis(depth_input,-1,0)
         depthgt2=np.expand_dims(depthgt, axis=0)
         # max_depth=10000.0/
-
+        # print(np.max(depth_input_mod))
         return depth_input_mod/np.max(depth_input_mod), depthgt2/np.max(depth_input_mod)
         # return depth_input_mod, depth
 

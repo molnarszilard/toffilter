@@ -1,6 +1,7 @@
 from autoencoder import Autoencoder
 from model_fpn import DFILT
 from model_unet import DFILTUNET
+from unet_model import UNet
 from threading import Thread
 from torch.autograd import Variable
 from torchvision.utils import save_image
@@ -35,7 +36,10 @@ def parse_args():
                       default=True, type=bool)
     parser.add_argument('--model_path', dest='model_path',
                       help='path to the model to use',
-                      default='saved_models/dfilt_1_9_v54.pth', type=str)
+                      default='saved_models/dfilt_1_9_v56s.pth', type=str)
+    parser.add_argument('--model', dest='model',
+                      help='modeltype: dfilt, dfiltunet, unet, ae',
+                      default="ae", type=str)
 
     args = parser.parse_args()
     return args
@@ -49,9 +53,14 @@ if __name__ == '__main__':
     
     # network initialization
     print('Initializing model...')
-    # dfilt = DFILT(fixed_feature_weights=False)
-    # dfilt = DFILTUNET(fixed_feature_weights=False)
-    dfilt = Autoencoder()
+    if args.model is 'dfilt':
+        dfilt = DFILT(fixed_feature_weights=False)
+    if args.model is 'dfiltunet':
+        dfilt = DFILTUNET(fixed_feature_weights=False)
+    if args.model is 'unet':
+        dfilt = UNet(3,1)
+    if args.model is 'ae':
+        dfilt = Autoencoder()
     if args.cuda:
         dfilt = dfilt.cuda()
         
