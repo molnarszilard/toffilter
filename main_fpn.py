@@ -58,7 +58,7 @@ def parse_args():
                       default='saved_models', type=str)
     parser.add_argument('--model', dest='model',
                       help='modeltype: dfilt, dfiltunet, unet, ae',
-                      default="ae", type=str)
+                      default="dfilt", type=str)
 
 # config optimization
     parser.add_argument('--o', dest='optimizer',
@@ -75,7 +75,7 @@ def parse_args():
                       default=0.1, type=float)
     parser.add_argument('--lt', dest='losst',
                       help='losstype: DDD, ownBCE, BCE, BCElogits, maskloss, pwloss',
-                      default="mse", type=str)
+                      default="DDD", type=str)
 
 
 # set training session

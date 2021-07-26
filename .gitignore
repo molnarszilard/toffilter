@@ -1,3 +1,10 @@
 .DS_Store
 saved_models/*
 *.txt
+*pycache*
+*.png
+*.jpg
+*.pcd
+.vscode/*
+*.ipynb
+*.pyc

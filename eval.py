@@ -29,17 +29,20 @@ def parse_args():
                       default=1, type=int)  
     parser.add_argument('--input_image_path', dest='input_image_path',
                       help='path to a single input image for evaluation',
-                      default='/media/rambo/ssd2/Szilard/nyu_v2_filter/comparison/depth3_/', type=str)
+                      default='/media/rambo/ssd2/Szilard/nyu_v2_filter/comparison/depth3_n10/', type=str)
+    parser.add_argument('--output_output_path', dest='output_image_path',
+                      help='path to a single input image for evaluation',
+                      default='/media/rambo/ssd2/Szilard/nyu_v2_filter/comparison/predictions/', type=str)
                     #   default='/media/rambo/ssd2/Szilard/pico_tofnest/4bag_unfiltered/depth3/', type=str)
     parser.add_argument('--eval_folder', dest='eval_folder',
                       help='evaluate only one image or the whole folder',
                       default=True, type=bool)
     parser.add_argument('--model_path', dest='model_path',
                       help='path to the model to use',
-                      default='saved_models/dfilt_1_9_v56s.pth', type=str)
+                      default='saved_models/dfilt_1_9_v40.pth', type=str)
     parser.add_argument('--model', dest='model',
                       help='modeltype: dfilt, dfiltunet, unet, ae',
-                      default="ae", type=str)
+                      default="dfilt", type=str)
 
     args = parser.parse_args()
     return args
@@ -98,9 +101,10 @@ if __name__ == '__main__':
             zero_number = torch.tensor(0.).to('cuda')
             for filename in dlist:
                 if filename.endswith(".png"):
-                    path=args.input_image_path+filename
+                    inpath=args.input_image_path+filename
+                    outpath=args.output_image_path+filename
                     print("Predicting for:"+filename)
-                    depth = cv2.imread(path,cv2.IMREAD_UNCHANGED).astype(np.float32)
+                    depth = cv2.imread(inpath,cv2.IMREAD_UNCHANGED).astype(np.float32)
                     if len(depth.shape) < 3:
                         print("Got 1 channel depth images, creating 3 channel depth images")
                         combine_depth = np.empty((depth.shape[0],depth.shape[1], 3))
@@ -117,10 +121,9 @@ if __name__ == '__main__':
                     stop = timeit.default_timer()
                     time_sum=time_sum+stop-start
                     counter=counter+1
-                    save_path=path[:-4]
                     # npimage=(z_fake[0]*255).squeeze(0).cpu().detach().numpy().astype(np.uint8)
                     npimage=(z_fake[0]*m_depth).squeeze(0).cpu().detach().numpy().astype(np.uint16)
-                    cv2.imwrite(save_path +'_pred.png', npimage)
+                    cv2.imwrite(outpath, npimage)
 
                 else:
                     continue

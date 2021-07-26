@@ -13,19 +13,20 @@ import cv2
 
     
 class NYUv2Dataset(data.Dataset):
-    def __init__(self, root='/media/rambo/ssd2/Szilard/nyu_v2_filter/dataset_plane/', seed=None, train=True):
-    # def __init__(self, root='/media/rambo/ssd2/Szilard/pico_tofnest/1bag_augmented/dataset_filter/', seed=None, train=True):
+    # def __init__(self, root='/media/rambo/ssd2/Szilard/toffilter_nyu/dataset/', seed=None, train=True):
+    def __init__(self, root='/media/rambo/ssd2/Szilard/toffilter_isaac/dataset/', seed=None, train=True):
+    # def __init__(self, root='/media/rambo/ssd2/Szilard/nyu_v2_filter/dataset_plane/', seed=None, train=True):
         
         np.random.seed(seed)
         self.root = Path(root)
         self.train = train
         if train:
-            self.rgb_paths = [root+'depthgt/'+d for d in os.listdir(root+'depthgt/')]
+            self.rgb_paths = [root+'sparse/train/'+d for d in os.listdir(root+'sparse/train/')]
             # Randomly choose 50k images without replacement
-            self.rgb_paths = np.random.choice(self.rgb_paths, 500, False)
+            # self.rgb_paths = np.random.choice(self.rgb_paths, 500, False)
         else:
-            self.rgb_paths = [root+'depth3/'+d for d in os.listdir(root+'depth3/')]
-            self.rgb_paths = np.random.choice(self.rgb_paths, 100, False)
+            self.rgb_paths = [root+'sparse/test/'+d for d in os.listdir(root+'sparse/test/')]
+            # self.rgb_paths = np.random.choice(self.rgb_paths, 100, False)
         
 
         # self.augmentation = Compose([RandomHorizontalFlip()]) # , RandomCropRotate(10)
@@ -58,7 +59,7 @@ class NYUv2Dataset(data.Dataset):
             combine_depth[:,:,1] = depth_input
             combine_depth[:,:,2] = depth_input
             depth_input = combine_depth
-        depthgt = cv2.imread(path.replace('depth3', 'depthgt'),cv2.IMREAD_UNCHANGED ).astype(np.float32)
+        depthgt = cv2.imread(path.replace('sparse', 'dense'),cv2.IMREAD_UNCHANGED ).astype(np.float32)
         depth_input_mod = np.moveaxis(depth_input,-1,0)
         depthgt2=np.expand_dims(depthgt, axis=0)
         # max_depth=10000.0/
